@@ -614,6 +614,10 @@ body {
   cursor: pointer;
 }
 
+.access-note {
+  color: var(--muted);
+}
+
 .access-form {
   display: flex;
   align-items: center;
