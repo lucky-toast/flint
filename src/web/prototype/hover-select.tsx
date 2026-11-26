@@ -29,6 +29,7 @@ type Picked = { label: string; path: number[]; context: string };
 
 const ACCENT = "#e8590c";
 const FRAME_STYLE = `
+body.proto-over [data-proto-region] { outline: 1px dashed rgb(232 89 12 / 0.45); outline-offset: 2px; }
 [data-proto-hover] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
 [data-proto-selected] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.07) !important; }
 .proto-tag { position: absolute; z-index: 9999; background: ${ACCENT}; color: #fff; font: 600 13px/1 system-ui, sans-serif;
@@ -240,6 +241,19 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
         variant === "A" ? exactElement(el, root) : variant === "B" ? topLevelPart(el, root) : nearestClassed(el, root);
 
       // A fresh document (after an edit or order switch): find the selection again, or drop it.
+      // While the cursor is over the slip, every selectable region shows its box.
+      const candidates =
+        variant === "B"
+          ? [...(root?.children ?? [])].filter((c) => c.tagName !== "STYLE")
+          : [...(root?.querySelectorAll("[class]") ?? [])].filter((c) => classesOf(c).length);
+      for (const c of candidates) c.setAttribute("data-proto-region", "");
+      doc.documentElement.addEventListener("mouseenter", () => doc.body.classList.add("proto-over"));
+      doc.documentElement.addEventListener("mouseleave", () => {
+        doc.body.classList.remove("proto-over");
+        clearMark(doc, "data-proto-hover");
+        tag.hidden = true;
+      });
+
       if (pickedRef.current) {
         const again = atPath(doc, pickedRef.current.path);
         if (again) again.setAttribute("data-proto-selected", "");
@@ -257,10 +271,6 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
         tag.style.left = `${r.left + doc.defaultView!.scrollX - 2}px`;
         tag.style.top = `${r.top + doc.defaultView!.scrollY - 24}px`;
         tag.hidden = false;
-      });
-      doc.addEventListener("mouseleave", () => {
-        clearMark(doc, "data-proto-hover");
-        tag.hidden = true;
       });
       doc.addEventListener("click", (e) => {
         const el = target(e.target as Element);
