@@ -3,7 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { withAccessCode } from "./test/e2e/support/access";
-import { appPort, appURL, fakeEmberPort, fakeEmberURL, inspectorPort } from "./test/e2e/support/ports";
+import {
+  appPort,
+  appURL,
+  fakeEmberPort,
+  fakeEmberURL,
+  inspectorPort,
+  pausedAppPort,
+  pausedAppURL,
+  pausedInspectorPort,
+} from "./test/e2e/support/ports";
 
 // Browser tests run against `wrangler dev` serving the freshly built app, exactly as deployed,
 // with the Worker pointed at a fake Ember (test/e2e/support/fake-ember-server.ts) so CI spends nothing.
@@ -48,6 +57,20 @@ export default defineConfig({
       ].join(" "),
       url: `${appURL}/api/status`,
       // Always start a fresh server so a stale build (or another checkout's server) is never tested.
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: { WRANGLER_SEND_METRICS: "false" },
+    },
+    {
+      // The same build with the kill switch off (test/e2e/live-paused.spec.ts). Started after the main
+      // server, so the build above is already done; its state sits in its own directory.
+      command: [
+        "npx wrangler dev --env e2e",
+        `--ip 127.0.0.1 --port ${pausedAppPort} --inspector-port ${pausedInspectorPort}`,
+        `--persist-to "${join(stateDir, "paused")}"`,
+        `--var LIVE_MODE:off --var MODEL_API_BASE_URL:${fakeEmberURL}/v1`,
+      ].join(" "),
+      url: `${pausedAppURL}/api/status`,
       reuseExistingServer: false,
       timeout: 120_000,
       env: { WRANGLER_SEND_METRICS: "false" },

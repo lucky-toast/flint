@@ -1,8 +1,13 @@
 import { useState, type FormEvent } from "react";
-import type { AccessApi } from "./useAccess";
+import type { AccessApi, NotLiveReason } from "./useAccess";
+
+const NOT_LIVE_NOTE: Record<NotLiveReason, string> = {
+  paused: "Live mode is paused",
+  budget: "Live budget is used up",
+};
 
 /** The header's mode badge (Live or Replay) and the access-code entry. */
-export function AccessCode({ mode, hasCode, submit, forget }: AccessApi) {
+export function AccessCode({ mode, hasCode, notLive, submit, forget }: AccessApi) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,6 +28,25 @@ export function AccessCode({ mode, hasCode, submit, forget }: AccessApi) {
     );
   }
 
+  const replayBadge = (
+    <span className="mode-badge mode-replay" title="Playing recorded responses to the demo requests">
+      Replay
+    </span>
+  );
+
+  // A valid code, but live mode is unavailable: say why rather than offering the code entry again.
+  if (hasCode && notLive) {
+    return (
+      <div className="access">
+        {replayBadge}
+        <span className="access-note">{NOT_LIVE_NOTE[notLive]}</span>
+        <button type="button" className="access-link" onClick={forget}>
+          Forget code
+        </button>
+      </div>
+    );
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!code.trim() || busy) return;
@@ -38,9 +62,7 @@ export function AccessCode({ mode, hasCode, submit, forget }: AccessApi) {
 
   return (
     <div className="access">
-      <span className="mode-badge mode-replay" title="Playing recorded responses to the demo requests">
-        Replay
-      </span>
+      {replayBadge}
       {open ? (
         <form className="access-form" onSubmit={onSubmit} aria-label="Enter an access code">
           <input
