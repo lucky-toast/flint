@@ -131,6 +131,33 @@ body {
   gap: 8px;
 }
 
+/* An undone turn stays in the chat, faded, with an "Undone" mark. */
+.turn-undone .message {
+  opacity: 0.5;
+}
+
+.turn-undone .message-flint p {
+  text-decoration: line-through;
+}
+
+.turn-mark {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.try-again {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
 .message {
   max-width: 85%;
   padding: 8px 12px;

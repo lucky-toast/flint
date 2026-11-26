@@ -1,4 +1,4 @@
-import type { HistoryTurn, TurnResult } from "../../core";
+import { HISTORY_LIMIT, type HistoryTurn, type TurnResult } from "../../core";
 import { flintText } from "./flint-text";
 
 // The editor's client state for one shop + template: the version stack and the chat, as turns.
@@ -29,7 +29,11 @@ export type Session = {
 
 export type SessionAction =
   | { type: "sent"; message: string }
-  | { type: "replied"; turnId: number; result: TurnResult };
+  | { type: "replied"; turnId: number; result: TurnResult }
+  /** Steps the working slip back one version and marks that edit's turn undone. */
+  | { type: "undid" }
+  /** Try again: drops the turn's edit and reply, so the turn waits for Flint's new reply. */
+  | { type: "retried"; turnId: number };
 
 export function createSession(source: string): Session {
   return { original: source, versions: [{ source, turnId: null }], turns: [], nextTurnId: 1 };
@@ -48,7 +52,31 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
         result.type === "edit" ? [...state.versions, { source: result.templateSource, turnId }] : state.versions;
       return { ...state, turns, versions };
     }
+    case "undid": {
+      if (!canUndo(state)) return state;
+      const { turnId } = state.versions[state.versions.length - 1]!;
+      const turns = state.turns.map((t) => (t.id === turnId ? { ...t, undone: true } : t));
+      return { ...state, turns, versions: state.versions.slice(0, -1) };
+    }
+    case "retried": {
+      if (pendingTurn(state) || retryableTurn(state)?.id !== action.turnId) return state;
+      const turns = state.turns.map((t) => (t.id === action.turnId ? { id: t.id, message: t.message } : t));
+      return { ...state, turns, versions: state.versions.slice(0, -1) };
+    }
   }
+}
+
+/** Whether Undo has a version to step back to (and Flint isn't mid-reply). */
+export function canUndo(state: Session): boolean {
+  return state.versions.length > 1 && !pendingTurn(state);
+}
+
+/** The turn Try again would redo: the latest turn, when its edit is the working slip. */
+export function retryableTurn(state: Session): (Turn & { result: TurnResult }) | undefined {
+  const last = state.turns[state.turns.length - 1];
+  const top = state.versions[state.versions.length - 1]!;
+  if (!last?.result || last.undone || last.result.type !== "edit" || top.turnId !== last.id) return undefined;
+  return { ...last, result: last.result };
 }
 
 /** The template the working slip shows and the next request edits. */
@@ -61,9 +89,13 @@ export function pendingTurn(state: Session): Turn | undefined {
   return state.turns.find((t) => !t.result);
 }
 
-/** The conversation as sent to Ember: answered, not-undone turns. (The Worker trims it to the last few.) */
+/**
+ * The conversation as sent to Ember: the last few answered turns that weren't undone. Error turns
+ * are left out: "Flint is resting" and the like aren't Flint's replies. (The Worker trims too.)
+ */
 export function historyForEmber(state: Session): HistoryTurn[] {
   return state.turns
-    .filter((t): t is Turn & { result: TurnResult } => !!t.result && !t.undone)
+    .filter((t): t is Turn & { result: TurnResult } => !!t.result && !t.undone && t.result.type !== "error")
+    .slice(-HISTORY_LIMIT)
     .map((t) => ({ user: t.message, flint: flintText(t.result) }));
 }

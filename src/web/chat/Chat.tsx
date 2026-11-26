@@ -3,10 +3,17 @@ import type { Turn } from "../session/session";
 import { Composer } from "./Composer";
 import { FlintMessage } from "./FlintMessage";
 
-type Props = { turns: Turn[]; thinking: boolean; onSend: (message: string) => void };
+type Props = {
+  turns: Turn[];
+  thinking: boolean;
+  onSend: (message: string) => void;
+  /** The turn that offers Try again, if any. */
+  retryTurnId?: number;
+  onTryAgain?: () => void;
+};
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -22,13 +29,24 @@ export function Chat({ turns, thinking, onSend }: Props) {
           </div>
         )}
         {turns.map((turn, i) => (
-          <div key={turn.id} className={turn.undone ? "turn turn-undone" : "turn"} data-turn-id={turn.id}>
+          <div
+            key={turn.id}
+            className={turn.undone ? "turn turn-undone" : "turn"}
+            data-turn-id={turn.id}
+            data-undone={turn.undone ? "true" : undefined}
+          >
             <div className="message message-seller" data-author="seller">
               <p>{turn.message}</p>
             </div>
             {turn.result && (
               // Chips stay live only on the latest turn: once the seller answers, they're spent.
               <FlintMessage result={turn.result} onChoose={i === turns.length - 1 && !thinking ? onSend : undefined} />
+            )}
+            {turn.undone && <span className="turn-mark">Undone</span>}
+            {turn.id === retryTurnId && onTryAgain && !thinking && (
+              <button type="button" className="try-again" onClick={onTryAgain}>
+                Try again
+              </button>
             )}
           </div>
         ))}

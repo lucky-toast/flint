@@ -20,6 +20,10 @@ export function editor(page: Page) {
     input,
     sendButton: page.getByRole("button", { name: "Send" }),
     thinking: page.getByText("Flint is thinking…"),
+    undoButton: page.getByRole("button", { name: "Undo" }),
+    tryAgainButton: chat.getByRole("button", { name: "Try again" }),
+    /** The chat turn whose seller message contains this text. */
+    turn: (text: string) => chat.locator(".turn", { has: page.locator('[data-author="seller"]', { hasText: text }) }),
     /** A message from Flint containing this text. */
     flintSays: (text: string | RegExp) => chat.locator('[data-author="flint"]', { hasText: text }),
     /** A message from the seller containing this text. */

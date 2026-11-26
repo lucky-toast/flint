@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Shop, Template } from "../../core";
 import { Chat } from "../chat/Chat";
-import { workingSource } from "../session/session";
+import { canUndo, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
 import { OrderPicker } from "./OrderPicker";
@@ -23,6 +23,9 @@ export function Editor({ shop, template }: Props) {
     <div className="editor">
       <div className="editor-toolbar">
         <OrderPicker orders={shop.orders} orderId={order.id} onChange={setOrderId} />
+        <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
+          Undo
+        </button>
       </div>
       <div className="editor-panes">
         <SlipPane label="Original" source={session.state.original} shop={shop} order={order} paper={template.paper} />
@@ -37,7 +40,13 @@ export function Editor({ shop, template }: Props) {
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} />
         </SlipPane>
       </div>
-      <Chat turns={session.state.turns} thinking={session.thinking} onSend={session.send} />
+      <Chat
+        turns={session.state.turns}
+        thinking={session.thinking}
+        onSend={session.send}
+        retryTurnId={retryableTurn(session.state)?.id}
+        onTryAgain={session.tryAgain}
+      />
     </div>
   );
 }
