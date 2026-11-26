@@ -17,11 +17,13 @@ type Props = {
   footer?: ReactNode;
   /** PROTOTYPE (#20): passed to the preview frame. */
   onDocument?: (doc: Document, frame: HTMLIFrameElement) => void;
+  /** PROTOTYPE (#20): rewrites the source before rendering (preview only). */
+  instrument?: (source: string) => string;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument }: Props) {
-  const rendered = useRenderedSlip(source, shop, order, assets);
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, instrument }: Props) {
+  const rendered = useRenderedSlip(instrument ? instrument(source) : source, shop, order, assets);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
       <h2>{label}</h2>

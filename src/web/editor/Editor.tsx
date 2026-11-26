@@ -79,6 +79,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           paper={template.paper}
           assets={uploads.assets}
           onDocument={proto.onWorkingDocument}
+          instrument={proto.instrument}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />

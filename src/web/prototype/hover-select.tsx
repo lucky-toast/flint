@@ -14,10 +14,48 @@
 // While the cursor is over the slip, every region you could select right now shows a faint box.
 // In every variant Flint gets the part's name and its first line in the template, quoted verbatim,
 // so it can copy it into an edit (Flint edits by exact find/replace and never sees line numbers).
+//
+// Finding that line: the working slip renders an instrumented copy of the template where every
+// opening tag carries data-flint-line="N" (preview only: never saved, never sent to Flint). A click
+// knows its exact source line; if that line's text appears more than once in the template, the
+// quote grows by following lines until it is unique (the same rule as Flint's find/replace). When one
+// line renders many elements (a loop), Flint is told it repeats.
+//
+// A seeded saved template, "Look-alike test (prototype)" for Kiln & Co., has two identical
+// <section class="addresses"><div class="ship-to"> blocks to try this on.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MAX_MESSAGE_LENGTH } from "../../core";
+import { classic } from "../../data/templates/classic";
+
+/** Preview-only copy of the template: every opening tag carries its 1-based source line. */
+export function instrumentSource(source: string): string {
+  return source
+    .split("\n")
+    .map((line, i) => line.replace(/<([a-zA-Z][a-zA-Z0-9]*)(?=[\s>\/])/g, `<$1 data-flint-line="${i + 1}"`))
+    .join("\n");
+}
+
+/** Seeds a Kiln & Co. saved template with two look-alike sections, once. */
+function seedLookalike() {
+  const key = "flint:templates:kiln-and-co";
+  const list = JSON.parse(localStorage.getItem(key) ?? "[]") as { id: string }[];
+  if (list.some((t) => t.id === "proto-lookalike")) return;
+  const returnTo = `
+  <section class="addresses">
+    <div class="ship-to">
+      <h2>Return to</h2>
+      <p>{{ shop.name | escape }}<br>12 Clay Lane<br>Asheville, NC 28801</p>
+    </div>
+  </section>
+`;
+  const source = classic.source.replace("\n  {% assign items", `${returnTo}
+  {% assign items`);
+  list.push({ ...classic, id: "proto-lookalike", name: "Look-alike test (prototype)", builtIn: false, source } as never);
+  localStorage.setItem(key, JSON.stringify(list));
+}
+if (new URLSearchParams(location.search).has("variant")) seedLookalike();
 
 export type Variant = "A" | "B" | "C";
 const VARIANTS: Variant[] = ["A", "B", "C"];
@@ -113,15 +151,32 @@ function namedParts(el: Element): Element[] {
   });
 }
 
-/** Flint gets the part's name and its first template line, verbatim, found by tag and first class. */
+/** The shortest run of source lines starting at `start` (0-based) whose text occurs once in the source. */
+function uniqueSnippet(lines: string[], start: number): string {
+  const source = lines.join("\n");
+  for (let end = start; end < lines.length; end++) {
+    const snippet = lines.slice(start, end + 1).join("\n");
+    if (source.indexOf(snippet) === source.lastIndexOf(snippet)) return snippet;
+  }
+  return lines.slice(start).join("\n");
+}
+
+/** Flint gets the part's name and its template line(s), verbatim and unique, from the instrumented render. */
 function sourceContext(el: Element, source: string): string {
-  const tag = el.tagName.toLowerCase();
-  const cls = classesOf(el)[0];
-  const line = cls
-    ? source.split("\n").find((l) => new RegExp(`<${tag}\\b[^>]*class="[^"]*\\b${cls}\\b`).test(l))
-    : undefined;
-  const quoted = (line?.trim() ?? `<${tag}${cls ? ` class="${cls}"` : ""}>`).slice(0, 180);
-  return `(The seller selected the "${labelFor(el)}" part of the slip. It starts at this template line: ${quoted})`;
+  const n = Number(el.getAttribute("data-flint-line"));
+  const lines = source.split("\n");
+  const name = `"${labelFor(el)}"`;
+  if (!n || !lines[n - 1]) return `(The seller selected the ${name} part of the slip.)`;
+  const snippet = uniqueSnippet(lines, n - 1)
+    .split("\n")
+    .map((l) => l.trim())
+    .join(" ⏎ ")
+    .slice(0, 260);
+  const repeats = el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`).length;
+  // Several elements on one line (e.g. <td>s) all share it; count only same-tag siblings of the line.
+  const sameTag = [...el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`)].filter((e) => e.tagName === el.tagName).length;
+  const repeatNote = repeats > 1 && sameTag > 1 ? ` It repeats ${sameTag} times on this order (one template line, e.g. a loop).` : "";
+  return `(The seller selected the ${name} part of the slip. In the template it is: ${snippet}.${repeatNote})`;
 }
 
 function clearMark(doc: Document, attr: string) {
@@ -257,7 +312,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
   };
   const canGoBigger = !!selectedEl && selectedEl.parentElement !== root && !!root;
 
-  if (!variant) return { onWorkingDocument: undefined, send, composerAddon: null, overlay: null };
+  if (!variant) return { onWorkingDocument: undefined, instrument: undefined, send, composerAddon: null, overlay: null };
 
   const parts = variant === "C" && selectedEl && sectionOf(selectedEl, root) === selectedEl ? namedParts(selectedEl) : [];
   const hint: Record<Variant, string> = {
@@ -324,5 +379,5 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
     document.body,
   );
 
-  return { onWorkingDocument, send: sendWithSelection, composerAddon, overlay };
+  return { onWorkingDocument, instrument: instrumentSource, send: sendWithSelection, composerAddon, overlay };
 }
