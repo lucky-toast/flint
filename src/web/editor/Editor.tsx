@@ -1,24 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Shop, Template } from "../../core";
 import { uploadFollowUp } from "../assets/asset-store";
 import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
-import { canUndo, retryableTurn, workingSource } from "../session/session";
+import { canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
 import { OrderPicker } from "./OrderPicker";
 import { ShowCode } from "./ShowCode";
+import { SlipActions } from "./SlipActions";
 import { SlipPane } from "./SlipPane";
 
-type Props = { shop: Shop; template: Template };
+type Props = {
+  shop: Shop;
+  template: Template;
+  /** After a save: the template the session now belongs to (the new one, or the one overwritten). */
+  onSaved?: (template: Template) => void;
+  /** Told whenever the working slip starts or stops differing from what was opened or last saved. */
+  onUnsavedChange?: (unsaved: boolean) => void;
+};
 
 /**
  * The editor for one shop + template: the original slip pinned beside the working slip, and the
- * chat with Flint. Mount it with a key per shop + template so switching starts a fresh session.
+ * chat with Flint. Mount it with a key per session so opening another template starts a fresh one.
+ * The template prop may change while mounted (after Save as new); the session carries on.
  */
-export function Editor({ shop, template }: Props) {
+export function Editor({ shop, template, onSaved, onUnsavedChange }: Props) {
   const uploads = useUploadedAssets(shop);
   const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
+  const unsaved = hasUnsavedChanges(session.state);
+  useEffect(() => onUnsavedChange?.(unsaved), [unsaved, onUnsavedChange]);
   // After an upload, a follow-up turn tells Flint the image is there so it carries on.
   const upload = async (file: File, name: string) => {
     const result = await uploads.upload(file, name);
@@ -35,6 +46,16 @@ export function Editor({ shop, template }: Props) {
         <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
           Undo
         </button>
+        <SlipActions
+          shop={shop}
+          template={template}
+          source={workingSource(session.state)}
+          disabled={!!pendingTurn(session.state)}
+          onSaved={(saved) => {
+            session.saved();
+            onSaved?.(saved);
+          }}
+        />
       </div>
       <div className="editor-panes">
         <SlipPane
