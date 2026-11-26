@@ -1,7 +1,11 @@
 // Flint Worker: serves the static app (via the ASSETS binding) and the /api/* routes.
-import { createEmberClient, DEFAULT_EMBER_BASE_URL, EmberError, runTurn, type TurnResult } from "../core";
+import { createEmberClient, DEFAULT_EMBER_BASE_URL, EmberError, runTurn, type TurnRequest, type TurnResult } from "../core";
 import { shops } from "../data";
+import { budgetedEmber, BudgetExhausted, GLOBAL_BUDGET } from "./budget";
+import { withinRateLimits } from "./rate-limits";
 import { parseTurnRequest } from "./turn-request";
+
+export { BudgetDO } from "./budget";
 
 export type Status = { live: boolean; budgetRemainingPct: number };
 
@@ -10,9 +14,25 @@ function isLive(env: Env): boolean {
   return env.LIVE_MODE === "on" && !!env.EMBER_API_KEY;
 }
 
-function status(env: Env): Status {
-  // Budget tracking (Durable Object) lands in a later ticket; until then the budget is untouched.
-  return { live: env.LIVE_MODE === "on", budgetRemainingPct: 100 };
+function budget(env: Env) {
+  return env.BUDGET.getByName(GLOBAL_BUDGET);
+}
+
+async function status(env: Env): Promise<Status> {
+  const { remainingPct } = await budget(env).snapshot();
+  return { live: isLive(env), budgetRemainingPct: remainingPct };
+}
+
+/** Why a turn isn't served live. */
+type NotLiveReason = "off" | "rate_limited" | "budget" | "ember_failed";
+
+/**
+ * Answers a turn that can't (or can no longer) be served live. The replay ticket hooks in here:
+ * a request matching a recording is answered from replay; anything else rests.
+ */
+function notLive(_request: TurnRequest, reason: NotLiveReason): Response {
+  console.log(`turn not live: ${reason}`);
+  return Response.json({ type: "error", error: "resting" } satisfies TurnResult);
 }
 
 async function turn(request: Request, env: Env): Promise<Response> {
@@ -29,25 +49,27 @@ async function turn(request: Request, env: Env): Promise<Response> {
   const shop = shops.find((s) => s.id === shopId);
   if (!shop) return Response.json({ error: "bad_request", detail: `unknown shop ${shopId}` }, { status: 400 });
 
-  // Replay mode lands in a later ticket; until then a non-live Worker is "resting".
-  if (!isLive(env)) return Response.json({ type: "error", error: "resting" } satisfies TurnResult);
+  if (!isLive(env)) return notLive(parsed.request, "off");
+  if (!(await withinRateLimits(request, env))) return notLive(parsed.request, "rate_limited");
 
-  const ember = createEmberClient({
-    apiKey: env.EMBER_API_KEY!,
-    baseUrl: env.MODEL_API_BASE_URL || DEFAULT_EMBER_BASE_URL,
-  });
+  // Every Ember call reserves its worst case in the budget first and settles its actual usage after.
+  const ember = budgetedEmber(
+    createEmberClient({ apiKey: env.EMBER_API_KEY!, baseUrl: env.MODEL_API_BASE_URL || DEFAULT_EMBER_BASE_URL }),
+    budget(env),
+  );
   try {
     return Response.json(await runTurn({ ember, shop, input }));
   } catch (err) {
+    if (err instanceof BudgetExhausted) return notLive(parsed.request, "budget");
     if (!(err instanceof EmberError)) throw err;
     console.error(err.message);
-    return Response.json({ type: "error", error: "resting" } satisfies TurnResult);
+    return notLive(parsed.request, "ember_failed");
   }
 }
 
 async function handleApi(request: Request, env: Env, path: string): Promise<Response> {
   if (path === "/api/status" && request.method === "GET") {
-    return Response.json(status(env));
+    return Response.json(await status(env));
   }
   if (path === "/api/turn" && request.method === "POST") {
     return turn(request, env);

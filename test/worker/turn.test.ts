@@ -1,6 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtInTemplates } from "../../src/data";
+import { randomIp } from "./client";
 import { commentary, editCall, fakeEmber, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
 
 const classic = builtInTemplates.find((t) => t.id === "classic")!.source;
@@ -12,7 +13,8 @@ const sorted = classic.replace(SORT_FIND, SORT_REPLACE);
 function turn(body: Record<string, unknown>) {
   return exports.default.fetch("http://flint.test/api/turn", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    // A fresh IP per request keeps these tests clear of the per-IP rate limit.
+    headers: { "content-type": "application/json", "cf-connecting-ip": randomIp() },
     body: JSON.stringify({ shopId: "kiln-and-co", templateSource: classic, history: [], ...body }),
   });
 }
@@ -264,6 +266,12 @@ describe("POST /api/turn, requests", () => {
 
   it("answers resting when Ember fails", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream down", { status: 503 }));
+
+    expect(await turnJson({ message: "Sort items" })).toEqual({ type: "error", error: "resting" });
+  });
+
+  it("answers resting when Ember sends a body that isn't JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("<html>gateway</html>", { status: 200 }));
 
     expect(await turnJson({ message: "Sort items" })).toEqual({ type: "error", error: "resting" });
   });
