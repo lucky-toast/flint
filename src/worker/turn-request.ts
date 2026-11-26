@@ -2,6 +2,7 @@ import {
   HISTORY_LIMIT,
   isAssetName,
   MAX_MESSAGE_LENGTH,
+  MAX_SELECTION_LENGTH,
   MAX_UPLOADED_ASSETS,
   type HistoryTurn,
   type TurnRequest,
@@ -22,28 +23,39 @@ type Parsed = { ok: true; request: TurnRequest } | { ok: false; error: string };
 function isHistoryTurn(value: unknown): value is HistoryTurn {
   if (!value || typeof value !== "object") return false;
   const t = value as HistoryTurn;
-  return typeof t.user === "string" && typeof t.flint === "string";
+  return (
+    typeof t.user === "string" &&
+    typeof t.flint === "string" &&
+    (t.selection === undefined || typeof t.selection === "string")
+  );
 }
 
 /**
- * Checks a POST /api/turn body. History beyond the last few turns, over-long history turns and an
- * over-long retry hint are trimmed, not refused.
+ * Checks a POST /api/turn body. History beyond the last few turns, over-long history turns, an
+ * over-long retry hint and an over-long selection are trimmed, not refused. The selection is a
+ * field of its own, so it doesn't count against the message cap.
  */
 export function parseTurnRequest(body: unknown): Parsed {
   if (!body || typeof body !== "object") return { ok: false, error: "body must be an object" };
-  const { shopId, templateSource, history, message, retryHint, uploadedAssets } = body as Record<string, unknown>;
+  const { shopId, templateSource, history, message, retryHint, uploadedAssets, selection } = body as Record<
+    string,
+    unknown
+  >;
   if (typeof shopId !== "string") return { ok: false, error: "shopId must be a string" };
   if (typeof templateSource !== "string" || templateSource.length > MAX_TEMPLATE_LENGTH) {
     return { ok: false, error: `templateSource must be a string of at most ${MAX_TEMPLATE_LENGTH} characters` };
   }
   if (!Array.isArray(history) || !history.every(isHistoryTurn)) {
-    return { ok: false, error: "history must be an array of { user, flint } strings" };
+    return { ok: false, error: "history must be an array of { user, flint, selection? } strings" };
   }
   if (typeof message !== "string" || message.trim() === "" || message.length > MAX_MESSAGE_LENGTH) {
     return { ok: false, error: `message must be 1-${MAX_MESSAGE_LENGTH} characters` };
   }
   if (retryHint !== undefined && typeof retryHint !== "string") {
     return { ok: false, error: "retryHint must be a string" };
+  }
+  if (selection !== undefined && typeof selection !== "string") {
+    return { ok: false, error: "selection must be a string" };
   }
   if (
     uploadedAssets !== undefined &&
@@ -59,10 +71,12 @@ export function parseTurnRequest(body: unknown): Parsed {
       history: history.slice(-HISTORY_LIMIT).map((t) => ({
         user: t.user.slice(0, MAX_HISTORY_USER_LENGTH),
         flint: t.flint.slice(0, MAX_HISTORY_FLINT_LENGTH),
+        ...(t.selection ? { selection: t.selection.slice(0, MAX_SELECTION_LENGTH) } : {}),
       })),
       message,
       ...(retryHint ? { retryHint: retryHint.slice(0, MAX_RETRY_HINT_LENGTH) } : {}),
       ...(uploadedAssets?.length ? { uploadedAssets } : {}),
+      ...(selection ? { selection: selection.slice(0, MAX_SELECTION_LENGTH) } : {}),
     },
   };
 }

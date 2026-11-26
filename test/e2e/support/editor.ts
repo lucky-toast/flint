@@ -25,6 +25,14 @@ export function editor(page: Page) {
     /** The line above the message box while Redo has something to reapply. */
     redoWarning: page.getByText("Your next message clears Redo."),
     tryAgainButton: chat.getByRole("button", { name: "Try again" }),
+    /** The chip above the message box naming what's selected on the working slip ("📍 About: …"). */
+    selectionChip: page.getByRole("status", { name: "Selection" }),
+    selectBiggerButton: page.getByRole("button", { name: "Select bigger" }),
+    clearSelectionButton: page.getByRole("button", { name: "Clear selection" }),
+    /** The tip above the message box while nothing is selected. */
+    selectionTip: page.getByText("Tip: click part of the working slip to point at it."),
+    /** The name tag over the part under the cursor, inside the working slip. */
+    nameTag: page.frameLocator('iframe[title="Working slip"]').getByRole("tooltip"),
     /** The chat turn whose seller message contains this text. */
     turn: (text: string) => chat.locator(".turn", { has: page.locator('[data-author="seller"]', { hasText: text }) }),
     /** A message from Flint containing this text. */

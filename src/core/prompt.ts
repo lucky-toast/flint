@@ -63,8 +63,11 @@ Available assets: ${assets}, plus any images the seller uploaded, which the requ
 How to edit: call edit_template with edits applied in order. Each find must be copied character for character from the current template (including whitespace) and match it exactly once; include enough surrounding text to make it unique. Your edit is checked by rendering every example order; if it is rejected you will be told why, and the template stays unchanged.`;
 }
 
-/** One past exchange in the chat: what the seller said and what Flint showed them. */
-export type HistoryTurn = { user: string; flint: string };
+/**
+ * One past exchange in the chat: what the seller said and what Flint showed them, and the
+ * selection note it was sent with, if any.
+ */
+export type HistoryTurn = { user: string; flint: string; selection?: string };
 
 export type TurnInput = {
   templateSource: string;
@@ -74,22 +77,37 @@ export type TurnInput = {
   retryHint?: string;
   /** Names of images the seller uploaded for this shop (the images never leave the browser). */
   uploadedAssets?: string[];
+  /** What the seller pointed at on the working slip (see selectionNote in selection.ts). */
+  selection?: string;
 };
 
 /** How many past exchanges are sent to Ember. */
 export const HISTORY_LIMIT = 10;
 
-/** The user message: the working template, the seller's uploaded images, the recent conversation, then the request. */
-export function buildUserMessage({ templateSource, history, message, retryHint, uploadedAssets }: TurnInput): string {
+/**
+ * The user message: the working template, the seller's uploaded images, the recent conversation
+ * (each turn with its selection), then the request and its selection. Everything that varies per
+ * turn comes after the template, so the cached prefix (instructions, then template) is unchanged.
+ */
+export function buildUserMessage({
+  templateSource,
+  history,
+  message,
+  retryHint,
+  uploadedAssets,
+  selection,
+}: TurnInput): string {
   const parts = [`Current template:\n\`\`\`liquid\n${templateSource}\n\`\`\``];
   if (uploadedAssets?.length) {
     parts.push(`Images the seller uploaded (also available): ${uploadedAssets.map((n) => `assets.${n}`).join(", ")}.`);
   }
   const recent = history.slice(-HISTORY_LIMIT);
   if (recent.length > 0) {
-    parts.push(`Conversation so far:\n${recent.map((t) => `Seller: ${t.user}\nFlint: ${t.flint}`).join("\n")}`);
+    const lines = recent.map((t) => `Seller: ${t.user}\n${t.selection ? `${t.selection}\n` : ""}Flint: ${t.flint}`);
+    parts.push(`Conversation so far:\n${lines.join("\n")}`);
   }
   parts.push(`Request: ${message}`);
+  if (selection) parts.push(selection);
   if (retryHint) {
     parts.push(
       `The seller undid your last attempt at this request and wants a different approach. Last time: ${retryHint}`,

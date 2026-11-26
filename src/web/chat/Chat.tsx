@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Turn } from "../session/session";
 import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
@@ -17,10 +17,22 @@ type Props = {
   redoPending?: boolean;
   /** Replay mode's suggestion chips, shown above the message box. */
   replayChips?: string[];
+  /** What the next message is about (the selection chip), shown just above the message box. */
+  selectionChip?: ReactNode;
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, redoPending, replayChips }: Props) {
+export function Chat({
+  turns,
+  thinking,
+  onSend,
+  retryTurnId,
+  onTryAgain,
+  onUpload,
+  redoPending,
+  replayChips,
+  selectionChip,
+}: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -44,6 +56,8 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
           >
             <div className="message message-seller" data-author="seller">
               <p>{turn.message}</p>
+              {/* The part's name only: the template code Flint got never shows in the chat. */}
+              {turn.selection && <span className="selection-tag">📍 {turn.selection.name}</span>}
             </div>
             {turn.result && (
               // Chips stay live only on the latest turn: once the seller answers, they're spent.
@@ -69,6 +83,7 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
       </div>
       {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
       {redoPending && <p className="redo-warning">Your next message clears Redo.</p>}
+      {selectionChip}
       <Composer disabled={thinking} onSend={onSend} />
     </aside>
   );

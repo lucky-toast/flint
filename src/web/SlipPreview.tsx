@@ -1,7 +1,13 @@
 import { useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { PAPER_SIZES, PREVIEW_SANDBOX, previewDocument, type Paper } from "../core";
 
-type Props = { html: string; paper: Paper; title?: string };
+type Props = {
+  html: string;
+  paper: Paper;
+  title?: string;
+  /** Told about each freshly loaded slip document (same-origin), e.g. to listen for pointing at parts. */
+  onDocument?: (doc: Document) => void;
+};
 
 const PX_PER_UNIT: Record<string, number> = { in: 96, mm: 96 / 25.4 };
 
@@ -32,7 +38,7 @@ function blockLinks(event: SyntheticEvent<HTMLIFrameElement>) {
  * inside it are cancelled, so it can't navigate away either.
  * The frame is laid out at the paper's real size and scaled down to fit its container.
  */
-export function SlipPreview({ html, paper, title = "Slip preview" }: Props) {
+export function SlipPreview({ html, paper, title = "Slip preview", onDocument }: Props) {
   const size = PAPER_SIZES[paper];
   const width = toPx(size.width);
   const height = toPx(size.height);
@@ -57,7 +63,11 @@ export function SlipPreview({ html, paper, title = "Slip preview" }: Props) {
         data-paper={paper}
         sandbox={PREVIEW_SANDBOX}
         srcDoc={previewDocument(html, paper)}
-        onLoad={blockLinks}
+        onLoad={(e) => {
+          blockLinks(e);
+          const doc = e.currentTarget.contentDocument;
+          if (doc && onDocument) onDocument(doc);
+        }}
         style={{ width: size.width, height: size.height, transform: `scale(${scale})` }}
       />
     </div>
