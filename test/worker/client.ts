@@ -15,6 +15,16 @@ export function randomIp(): string {
   return `10.${n[0]}.${n[1]}.${n[2]}`;
 }
 
+/**
+ * Waits until the current rate-limit window has at least `marginMs` left. The binding's windows
+ * are aligned to the wall clock, so a burst that straddles a minute boundary would see its counts
+ * reset part-way through. Call this before a test that counts requests against a limit.
+ */
+export async function freshRateLimitWindow(marginMs = 5_000, periodMs = 60_000): Promise<void> {
+  const left = periodMs - (Date.now() % periodMs);
+  if (left < marginMs) await new Promise((resolve) => setTimeout(resolve, left + 50));
+}
+
 /** A random session id, sent as the x-flint-session header. */
 export function randomSession(): string {
   return crypto.randomUUID();
