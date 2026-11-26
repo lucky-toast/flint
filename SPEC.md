@@ -2,14 +2,14 @@
 
 > A browser app where sellers customize their packing-slip templates by chatting with **Flint**, a small helper powered by Meta's **Muse Ember**. Flint makes small, validated edits to a Liquid template; the seller sees the result next to the original before saving.
 
-**Constraints:** solo, ~1 week, public repo, Muse Ember is the only LLM.
-**Status:** design settled; model setup validated by the limit test (§11).
+**Constraints:** solo, public repo, Muse Ember is the only LLM, **total Muse Ember spend under $10** (going over disqualifies). Submission due **Dec 2, 9 PM ET**; demo video recorded by **Nov 30**.
+**Status:** design settled (open questions resolved Nov 26, see §13); model setup validated by the limit test (§11).
 
 ---
 
 ## 1. Problem & scope
 
-The production app (Electron) renders packing slips from Liquid templates. Today sellers ask the developer to edit the Liquid. Flint lets them do it in plain English. This hackathon build is a standalone public app; its `core/` is meant to port back into the Electron app.
+The production app (Electron) renders packing slips from Liquid templates. Today sellers ask the developer to edit the Liquid. Flint lets them do it in plain English. This hackathon build is a **completely standalone, independent** public app: nothing is copied from the Electron app or its in-progress port, which was only consulted for how orders are shaped. Its `core/` is meant to port back into the Electron app later.
 
 **Requests it must handle (also the demo script):**
 
@@ -18,7 +18,7 @@ The production app (Electron) renders packing slips from Liquid templates. Today
 | 1 | Make the logo bigger | Cosmetic edit |
 | 2 | Add another image (badge) to the header | Assets; asking for a missing upload |
 | 3 | Sort items by quantity, then SKU | Data logic |
-| 4 | Separate table per item category | Restructuring |
+| 4 | Separate table per item option (e.g. glaze, foil / non-foil) | Restructuring |
 | 5 | Orders over $200 get a "promo item" line | Conditional on order data |
 | 6 | Hide prices on gift orders | Conditional on order data |
 
@@ -30,7 +30,10 @@ The production app (Electron) renders packing slips from Liquid templates. Today
 
 | Topic | Decision |
 |---|---|
-| Template language | **Liquid (LiquidJS), built-ins only, no custom filters.** |
+| Template language | **Liquid (LiquidJS), all built-ins allowed, no custom filters, `strictVariables: true`.** Template content is HTML + CSS + Liquid. |
+| Independence | Standalone; **no code copied from the Electron app or its port.** Flint keeps its own data schema (§4); money arrives pre-formatted. |
+| Preview safety | Slips render in a **sandboxed iframe** (no scripts) with a CSP: `default-src 'self' data:; script-src 'none'; style-src 'self' data: 'unsafe-inline'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'`. Blocks scripts and remote URLs (which could leak order data). No extra validation rule needed. |
+| Testing | Not test-first. Worker tests with **`@cloudflare/vitest-pool-workers`** (runs locally in workerd, free); **Playwright** end-to-end against `wrangler dev` with the Worker pointed at a **fake Ember** replaying recorded responses ($0 in CI). Unit tests only where cheap (applying edits, item counts). Model quality stays in the limit-test harness. |
 | Prompting about Liquid | Built-in Liquid is **not explained** unless the limit test shows Ember doesn't know it. One fact has been earned so far (ranges only count up, §5.4). |
 | Stack | **Vite + React + TypeScript** SPA served by **one Cloudflare Worker** (static assets + `/api/*`), on a subdomain of your domain |
 | Portability | All logic in a framework-agnostic **`core/`** (rendering, Ember client, tools, validation) |
@@ -73,9 +76,9 @@ The production app (Electron) renders packing slips from Liquid templates. Today
 - **Original** stays fixed for the session; after **Save** it resets to the saved version.
 - **Working** shows the latest accepted version. Switching the example order re-renders both panes instantly.
 - **Show code** (hidden by default): Liquid source + diff vs original.
-- **Undo** steps back one version, client-side. **Try again** regenerates the last turn from the previous version with a "different approach" hint.
+- **Undo** steps back one version, client-side, and **removes that turn from the history sent to Ember** (the chat keeps it with an "undone" mark). **Try again** = undo + resend the same message with a "different approach" hint; its reply replaces the old bubble.
 - **"Flint is thinking…"** shows from send until reply (data-logic edits take 3–6 s).
-- Mobile: panes stack with tabs. Desktop-first.
+- Desktop only; no mobile layout.
 
 ### 3.3 Flint's responses
 | Situation | Ember does | UI |
@@ -83,7 +86,7 @@ The production app (Electron) renders packing slips from Liquid templates. Today
 | Clear request | `edit_template` | Working pane updates; bubble shows the tool's `summary` |
 | Vague ("make it nicer") | `ask_clarification` + 2–4 options | Bubble with quick-reply chips |
 | Too big ("redesign everything") | `ask_clarification` splitting it into steps | Chips ("Header", "Items table", …) |
-| Missing image | `request_asset` | Bubble with **Upload**; Flint continues after upload |
+| Missing image | `request_asset` | Bubble with **Upload**: seller picks the image **and names it**; the browser stores it as `assets.<name>` and sends a follow-up turn in the same history: "User supplied the `<name>` resource." Flint continues from there (**check Ember handles this well when built**) |
 | Out of scope / small talk | `reply` or plain text (first attempt only) | Bubble, offering the closest template-level option |
 | Edit still invalid after retries | (server) | "I couldn't make that change cleanly. Want to try wording it differently?" Working pane unchanged |
 | Reply cut off | (server) | "That's more than I can do in one go. Can we break it down?" |
@@ -123,7 +126,8 @@ type Order = {
   lineItems: LineItem[];
 };
 type LineItem = {
-  title: string; sku: string; category: string; quantity: number;
+  title: string; sku: string; quantity: number;
+  options: Record<string, string>;      // variations, e.g. { Finish: "Foil", Size: "3 in" }; same keys on every item in a shop
   unitPrice: number; unitPriceFormatted: string;
   lineTotal: number; lineTotalFormatted: string;
   personalization: string;              // "" when absent
@@ -131,7 +135,7 @@ type LineItem = {
 type Template = { id: string; name: string; builtIn: boolean; paper: "letter" | "a4" | "4x6"; source: string; updatedAt: string };
 ```
 - Render context: `{ shop: { name, platform }, assets, order }`. Money is pre-formatted (`*Formatted`) next to raw numbers for comparisons.
-- **Orders per shop (~6):** typical · gift with message · over $200 · large mixed (3+ categories, quantity ties) · single item · awkward (long names, empty optional fields, international).
+- **Orders per shop (~6):** typical · gift with message · over $200 · large mixed (3+ distinct option values, quantity ties) · single item · awkward (long names, empty optional fields, international).
 - **Assets:** each shop ships `logo` + 1–2 extras as SVGs. Uploads → data URLs in `localStorage` (`flint:<shopId>:assets`), ~200 KB cap. Templates reference `{{ assets.<name> }}` only.
 - **Schema doc for Ember:** typed field list with example values and "may be empty" notes (`schemaDoc` in `limit-test/fixtures.mjs`).
 
@@ -203,9 +207,9 @@ Working draft: `systemPrompt()` in `limit-test/limit-test.mjs`. Rules:
 Plus the schema, asset names, edit instructions and one **earned Liquid note**: *"ranges only count up, so (5..1) produces nothing. To count down, use (1..5) reversed."* (all 3 full-run failures were descending ranges). **Add further Liquid notes only with the same kind of evidence.**
 
 ### 5.5 Liquid environment
-`new Liquid({ strictFilters: true, strictVariables: false })`, built-ins only. Shared by browser, Worker and (later) Electron.
+`new Liquid({ strictFilters: true, strictVariables: true })`, built-ins only. Strict variables also rejects references to missing assets (`assets.<name>` not uploaded), so those edits fail validation and go back to Ember. Shared by browser, Worker and (later) Electron.
 - Multi-key sort works with built-ins: `sort: "sku" | reverse | sort: "quantity" | reverse` (LiquidJS `sort` is stable — verified on 2,000 random orders). Not portable to Shopify's Ruby Liquid. Ember produces this unprompted.
-- Grouping: built-in `group_by` → `[{ name, items }]`.
+- Grouping: built-in `group_by` → `[{ name, items }]`. Nested paths work: `group_by: "options.Finish"` (verified, LiquidJS 10.30.1). With strict variables, a missing key throws, so fixtures give every item in a shop the same option keys.
 
 ---
 
@@ -214,7 +218,7 @@ Plus the schema, asset names, edit instructions and one **earned Liquid note**: 
 | Layer | Mechanism | Default |
 |---|---|---|
 | Access code | `X-Flint-Code` vs `ACCESS_CODE` secret; without it → replay mode | Shared with judges |
-| Global cap | `BudgetDO` (Durable Object): reserve worst case before a call, settle after, refuse at cap. Track cached input separately (25× cheaper) | `TOKEN_BUDGET` ≈ $5 (~$0.0004/message measured → ~12,000 messages) |
+| Global cap | `BudgetDO` (Durable Object): reserve worst case before a call, settle after, refuse at cap. Track cached input separately (25× cheaper) | `TOKEN_BUDGET` = **$3** (~$0.0004/message measured → ~7,500 messages), leaving room under the $10 limit for dev and recording. Check the usage page daily; the Meta spend alert only emails, it doesn't stop usage |
 | Rate limits | Workers Rate Limiting binding | ~10 msg/min per IP, 20 per session |
 | Per call | 4,000 output cap; ≤2 retries; no retry on truncation | |
 | Input | Message ≤500 chars; history ~10 turns | |
@@ -228,6 +232,7 @@ Plus the schema, asset names, edit instructions and one **earned Liquid note**: 
 
 ## 7. Built-in templates
 Simple; each leaves room for the demo edits (name sort, one table, prices shown, no promo logic). Paper size is metadata driving preview size and `@page` CSS.
+- Items tables use `width: 100%; table-layout: fixed` with percentage widths on narrow column classes (qty, SKU, price) and a flexible title column. Tables Ember copies keep the classes, so split tables line up; added or removed columns take from or give back to the title column, so overall width never changes.
 - **Classic** (Letter/A4): logo header, order meta, ship-to, gift message, items table, totals, thank-you. The demo template.
 - **Compact** (4×6): black and white, dense, no prices, big order number.
 - **Boutique** (Letter/A4): script heading, centred, personal-note box.
@@ -252,17 +257,18 @@ flint/
 
 ## 9. Build schedule
 
-| Day | Work | Done when |
-|---|---|---|
-| 1 | Scaffold repo; `core/liquid.ts`, `prompt.ts`, `tools.ts` ported from the limit test; fixtures → `data/` | `core` renders Classic for all orders |
-| 2 | `core/turn.ts`, `ember.ts`, Worker `/api/turn` (live); editor shell: panes, order picker, chat | #3, #5, #6 work end to end |
-| 3 | Clarify / asset / reply handling, chips, upload, asset store; undo, try again; what-changed + warnings | All 8 scripted cases work |
-| 4 | Shop switcher, 3 shops × ~6 orders, 3 templates, picker, save / overwrite / discard, download, print | Full flow in all shops |
-| 5 | BudgetDO, rate limits, access code, replay mode + recordings; deploy | Public URL works live and in replay |
-| 6 | Flint personality pass, empty/error states, mobile, polish | Demo runs cleanly 3× in a row |
-| 7 | Buffer, README, demo video | Submitted |
+Compressed: build Nov 26–29, video Nov 30, buffer Dec 1–2. It doesn't need to be perfect.
 
-**Stretch:** Flint suggests template names · per-item rules ("for mugs, add care instructions") · keyboard shortcuts.
+| Date | Work | Done when |
+|---|---|---|
+| Nov 26 | Scaffold repo, Vitest + workers pool, Playwright; `core/liquid.ts`, `prompt.ts`, `tools.ts` from the limit test; fixtures → `data/`; `core/turn.ts`, `ember.ts`, Worker `/api/turn` (live) | `core` renders Classic for all orders; #3, #5, #6 work through the API |
+| Nov 27 | Editor: sandboxed panes, order picker, chat; clarify / asset / reply handling, chips, named upload, asset store; undo, try again; what-changed + warnings | All 8 scripted cases work end to end |
+| Nov 28 | Shop switcher, 3 shops × ~6 orders, 3 templates, picker, save / overwrite / discard, download, print; BudgetDO, rate limits, access code, replay mode + recordings; deploy | Public URL works live and in replay, in all shops |
+| Nov 29 | Worker tests, Playwright flows with fake Ember; Flint personality pass, empty/error states, polish. **Feature freeze** | Demo runs cleanly 3× in a row |
+| Nov 30 | Record demo video | Video done |
+| Dec 1–2 | README, usage screenshot (Nov 23–Dec 2, Muse Ember), fixes, submit | Submitted before Dec 2, 9 PM ET |
+
+**Stretch:** **image input**: seller uploads a photo of a slip they like, "make mine look like this" (Ember reads images natively; only if Nov 28 ends early) · Flint suggests template names · per-item rules ("for mugs, add care instructions") · keyboard shortcuts.
 
 ---
 
@@ -270,7 +276,7 @@ flint/
 1. Problem (20 s): "Sellers wait on a developer to change their packing slip."
 2. Classic, Kiln & Co., big order #1003 → open Flint.
 3. "Sort items by quantity, then SKU" → re-sorts.
-4. "Show a separate table for each category" → grouped tables.
+4. "Show a separate table for each glaze" → grouped tables.
 5. "Orders over $200 get a free mystery mini planter" → promo line; switch to a small order, it's gone.
 6. Gift order: "Hide prices on gift orders" → prices disappear; switch back, they're there.
 7. "Add my eco-friendly badge" → upload request → badge appears.
@@ -330,4 +336,24 @@ node review.mjs
 | Meta API outage during judging | Replay mode; recorded demo video |
 | `localStorage` quota | ~200 KB per asset; clear error |
 
-**Deferred / open:** retry strategy (feedback-only vs a fresh final attempt) · fixed column widths in built-in templates so split tables align · billing page still showed $0.00 after ~$0.14 of usage (likely lag or credits; check before relying on it).
+**Open:** billing page still showed $0.00 after ~$0.14 of usage (likely lag or credits; check before relying on it) · confirm Ember continues correctly after a named upload (§3.3).
+
+---
+
+## 13. Resolved questions (Nov 26)
+
+| Question | Decision |
+|---|---|
+| Retry strategy | Feedback-only: send the error back, as in §5.3 |
+| Data schema | Keep Flint's own schema (the Electron port's format isn't final); `giftMessage` and gift orders supported; money pre-formatted |
+| Item attributes | `options: Record<string, string>` replaces `category` |
+| Liquid scope | All built-ins, `strictVariables: true`; missing assets fail validation |
+| Settings toggles | None; Flint edits the template directly (e.g. hide prices) |
+| Preview safety | Sandboxed iframe + strict CSP (§2) |
+| Split-table alignment | Fixed table layout with column classes (§7) |
+| Undo / try again | Undo removes the turn from Ember's history; try again = undo + resend with hint |
+| Uploads | Seller names the asset; follow-up turn tells Ember it was supplied |
+| Testing | Workers Vitest pool + Playwright with fake Ember; not test-first |
+| Budget | `TOKEN_BUDGET` $3 |
+| Schedule | Compressed (§9); all 3 shops and 3 templates kept; no mobile layout |
+| Image input | Stretch goal |
