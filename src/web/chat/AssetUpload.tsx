@@ -10,6 +10,8 @@ export function AssetUpload({ onUpload }: Props) {
   const id = useId();
   const [file, setFile] = useState<File>();
   const [name, setName] = useState("");
+  // The name suggested from the last picked file. It follows each new pick until the seller edits it.
+  const [suggested, setSuggested] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [uploaded, setUploaded] = useState<string>();
@@ -44,7 +46,11 @@ export function AssetUpload({ onUpload }: Props) {
           const picked = e.target.files?.[0];
           setFile(picked);
           setError(undefined);
-          if (picked && !name) setName(suggestAssetName(picked.name));
+          if (picked && name === suggested) {
+            const next = suggestAssetName(picked.name);
+            setName(next);
+            setSuggested(next);
+          }
         }}
       />
       <label htmlFor={`${id}-name`}>Image name</label>

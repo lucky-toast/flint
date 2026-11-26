@@ -145,3 +145,24 @@ test("an oversized image shows a clear error and is not stored", async ({ page, 
   const [call] = await later.calls();
   expect(call.input[0].content).not.toContain("giant_banner");
 });
+
+test("picking another image after a too-large one suggests the new image's name", async ({ page, ember }) => {
+  await ember.onRequest("Add my oversized poster image", assetCall("Please upload your poster 🖼️"));
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send("Add my oversized poster image");
+  const upload = uploadForm(page);
+  await upload.file.setInputFiles({ name: "huge poster.png", mimeType: "image/png", buffer: Buffer.alloc(250 * 1024, 1) });
+  await expect(upload.name).toHaveValue("huge_poster");
+  await upload.button.click();
+  await expect(upload.form.getByRole("alert")).toContainText("over the 200 KB limit");
+
+  await upload.file.setInputFiles({ name: "small poster.png", mimeType: "image/png", buffer: PNG });
+  await expect(upload.name).toHaveValue("small_poster");
+
+  // A name the seller typed themselves is kept when they pick another file.
+  await upload.name.fill("my_poster");
+  await upload.file.setInputFiles({ name: "other.png", mimeType: "image/png", buffer: PNG });
+  await expect(upload.name).toHaveValue("my_poster");
+});
