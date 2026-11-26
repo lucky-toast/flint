@@ -11,12 +11,19 @@ export type SessionApi = {
   send: (message: string) => void;
 };
 
+export type SessionOptions = {
+  /** The names of the seller's uploaded images, read at send time so a just-uploaded one is included. */
+  uploadedAssetNames?: () => string[];
+};
+
 /** The editor session for one shop + template, wired to the Worker. */
-export function useSession(shop: Shop, template: Template): SessionApi {
+export function useSession(shop: Shop, template: Template, options: SessionOptions = {}): SessionApi {
   const [state, dispatch] = useReducer(sessionReducer, template.source, createSession);
   // The latest state, so `send` can read it without being recreated on every change.
   const latest = useRef(state);
   latest.current = state;
+  const uploadedAssetNames = useRef(options.uploadedAssetNames);
+  uploadedAssetNames.current = options.uploadedAssetNames;
 
   const send = useCallback(
     (raw: string) => {
@@ -29,6 +36,7 @@ export function useSession(shop: Shop, template: Template): SessionApi {
         templateSource: workingSource(current),
         history: historyForEmber(current),
         message,
+        uploadedAssets: uploadedAssetNames.current?.() ?? [],
       };
       dispatch({ type: "sent", message });
       // Mark pending synchronously so a double click can't send twice before React re-renders.

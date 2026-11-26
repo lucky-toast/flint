@@ -210,3 +210,43 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+.asset-upload {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.asset-upload input[type="text"] {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.asset-upload button {
+  justify-self: start;
+  font: inherit;
+  padding: 4px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.asset-upload button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.asset-upload-error {
+  color: #a3361a;
+}
+
+.asset-upload-done {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}

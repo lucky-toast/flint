@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { Turn } from "../session/session";
+import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
 import { FlintMessage } from "./FlintMessage";
 
-type Props = { turns: Turn[]; thinking: boolean; onSend: (message: string) => void };
+type Props = { turns: Turn[]; thinking: boolean; onSend: (message: string) => void; onUpload?: OnUpload };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend }: Props) {
+export function Chat({ turns, thinking, onSend, onUpload }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -26,7 +27,7 @@ export function Chat({ turns, thinking, onSend }: Props) {
             <div className="message message-seller" data-author="seller">
               <p>{turn.message}</p>
             </div>
-            {turn.result && <FlintMessage result={turn.result} />}
+            {turn.result && <FlintMessage result={turn.result} onUpload={onUpload} />}
           </div>
         ))}
         {thinking && (
