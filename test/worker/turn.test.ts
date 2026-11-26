@@ -201,6 +201,16 @@ describe("POST /api/turn, live edit", () => {
     expect(last.role).toBe("user");
     expect(last.content).toContain("Call edit_template");
   });
+
+  it("never returns text from a retry as a reply, even when every retry is text", async () => {
+    fakeEmber(
+      editCall([{ find: "nowhere to be found", replace: "x" }], "Hm"),
+      { output: [reasoning(), textMessage("Oops, let me fix that.")] },
+      { output: [reasoning(), textMessage("Fixed it, I promise!")] },
+    );
+
+    expect(await turnJson({ message: "Sort items" })).toEqual({ type: "error", error: "invalid" });
+  });
 });
 
 describe("POST /api/turn, other outcomes", () => {
@@ -211,6 +221,15 @@ describe("POST /api/turn, other outcomes", () => {
       type: "ask",
       question: "What should change?",
       options: ["Bigger logo", "Bolder totals"],
+    });
+  });
+
+  it("keeps at most four options on a clarifying question", async () => {
+    fakeEmber(toolCall("ask_clarification", { question: "Which part?", options: ["Header", "Items", "Totals", "Footer", "Gift"] }));
+
+    expect(await turnJson({ message: "Redesign everything" })).toMatchObject({
+      type: "ask",
+      options: ["Header", "Items", "Totals", "Footer"],
     });
   });
 
