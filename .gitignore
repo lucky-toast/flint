@@ -5,6 +5,8 @@
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+# Placeholder vars for the browser tests (no secrets; see the file)
+!.dev.vars.e2e
 
 # Dependencies and build output
 node_modules/

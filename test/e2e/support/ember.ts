@@ -83,8 +83,16 @@ export function truncated(): FakeResponse {
   return { status: "incomplete", output: [reasoning()], outputTokens: 4000 };
 }
 
-/** The full Responses API body for a scripted response. */
-function responseBody(r: FakeResponse) {
+/** Ember failing outright (e.g. an outage): the Worker reports "Flint is resting". */
+export type HttpFailure = { httpStatus: number; body?: unknown };
+
+export function emberDown(httpStatus = 503): HttpFailure {
+  return { httpStatus, body: { error: { message: "fake Ember: service unavailable" } } };
+}
+
+/** The full Responses API body for a scripted response (failures pass through as they are). */
+function responseBody(r: FakeResponse | HttpFailure) {
+  if ("httpStatus" in r) return r;
   const status = r.status ?? "completed";
   const outputTokens = r.outputTokens ?? 500;
   return {
@@ -124,11 +132,11 @@ export class FakeEmber {
   private ids: string[] = [];
 
   /** Answers turns whose request is `message` with these responses, one per attempt. */
-  async onRequest(message: string, ...responses: FakeResponse[]): Promise<Script> {
+  async onRequest(message: string, ...responses: (FakeResponse | HttpFailure)[]): Promise<Script> {
     return this.script({}, message, ...responses);
   }
 
-  async script(options: ScriptOptions, message: string, ...responses: FakeResponse[]): Promise<Script> {
+  async script(options: ScriptOptions, message: string, ...responses: (FakeResponse | HttpFailure)[]): Promise<Script> {
     const res = await fetch(`${fakeEmberURL}/__scripts`, {
       method: "POST",
       headers: { "content-type": "application/json" },

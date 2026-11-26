@@ -1,4 +1,4 @@
-import { COMMENTARY, editCall, expect, test, truncated } from "./support/ember";
+import { COMMENTARY, editCall, emberDown, expect, test, truncated } from "./support/ember";
 import { editor } from "./support/editor";
 
 const THANK_YOU = "Thank you for supporting";
@@ -112,6 +112,35 @@ test("an edit Flint can't make valid gets a suggestion to reword and leaves the 
   await expect(ed.flintSays(/rewording/)).toBeVisible();
   await expect(ed.flintSays("Done!")).toHaveCount(0);
   await expect(ed.working.getByText(THANK_YOU)).toBeVisible();
+});
+
+test("when Flint can't be reached it says it's resting and leaves the working slip unchanged", async ({ page, ember }) => {
+  await ember.onRequest("Add a little star by the logo", emberDown());
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send("Add a little star by the logo");
+
+  await expect(ed.flintSays("Flint is resting")).toBeVisible();
+  await expect(ed.working.getByText(THANK_YOU)).toBeVisible();
+});
+
+test("each turn carries the tab's session id, the same on every turn", async ({ page, ember }) => {
+  await ember.onRequest("Say hi in the footer", editCall([{ find: "Thank you for", replace: "Hi! Thank you for" }], "Said hi 👋"));
+  await ember.onRequest("Say bye in the footer", editCall([{ find: "Hi! Thank you for", replace: "Bye! Thank you for" }], "Said bye 👋"));
+  const ed = editor(page);
+  await page.goto("/");
+
+  const first = page.waitForRequest("**/api/turn");
+  await ed.send("Say hi in the footer");
+  await expect(ed.flintSays("Said hi 👋")).toBeVisible();
+  const second = page.waitForRequest("**/api/turn");
+  await ed.send("Say bye in the footer");
+  await expect(ed.flintSays("Said bye 👋")).toBeVisible();
+
+  const ids = [(await first).headers()["x-flint-session"], (await second).headers()["x-flint-session"]];
+  expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/);
+  expect(ids[1]).toBe(ids[0]);
 });
 
 test("the message box refuses more than 500 characters", async ({ page }) => {

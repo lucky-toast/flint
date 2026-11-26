@@ -11,7 +11,8 @@
 //                                (the longest match wins). The response served is responses[attempt - 1],
 //                                where the attempt is counted from the retry items in the request, so
 //                                the fake is stateless across turns and parallel tests don't interfere.
-// Unscripted calls get a 500, which the Worker reports as "Flint is resting".
+// Unscripted calls get a 500, which the Worker reports as "Flint is resting". Calls without the
+// placeholder key from .dev.vars.e2e get a 401, so a leaked real key fails the test instead.
 //
 // Runs with Node's built-in type stripping (`node test/e2e/support/fake-ember-server.ts <port>`),
 // so it uses erasable TypeScript only and imports nothing but Node built-ins.
@@ -51,7 +52,14 @@ function findScript(message: string): Script | undefined {
   return best;
 }
 
+/** The placeholder key in .dev.vars.e2e. Anything else means the Worker picked up some other key. */
+const EXPECTED_AUTH = "Bearer fake-ember-key";
+
 async function respond(req: IncomingMessage, res: ServerResponse) {
+  if (req.headers.authorization !== EXPECTED_AUTH) {
+    console.error("[fake-ember] refused a call that didn't carry the e2e placeholder key (check .dev.vars.e2e)");
+    return send(res, 401, { error: { message: "fake Ember: unexpected API key" } });
+  }
   const body = await readJson(req);
   const { message, attempt } = turnOf(body);
   const script = findScript(message);
@@ -66,6 +74,9 @@ async function respond(req: IncomingMessage, res: ServerResponse) {
     return send(res, 500, { error: { message: `fake Ember: no response scripted for attempt ${attempt}` } });
   }
   if (script.delayMs > 0) await new Promise((resolve) => setTimeout(resolve, script.delayMs));
+  // A scripted HTTP failure: { httpStatus, body }.
+  const failure = response as { httpStatus?: number; body?: unknown };
+  if (typeof failure.httpStatus === "number") return send(res, failure.httpStatus, failure.body ?? {});
   send(res, 200, response);
 }
 
