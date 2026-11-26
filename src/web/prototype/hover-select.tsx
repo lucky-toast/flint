@@ -172,10 +172,11 @@ function sourceContext(el: Element, source: string): string {
     .map((l) => l.trim())
     .join(" ⏎ ")
     .slice(0, 260);
-  const repeats = el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`).length;
-  // Several elements on one line (e.g. <td>s) all share it; count only same-tag siblings of the line.
-  const sameTag = [...el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`)].filter((e) => e.tagName === el.tagName).length;
-  const repeatNote = repeats > 1 && sameTag > 1 ? ` It repeats ${sameTag} times on this order (one template line, e.g. a loop).` : "";
+  // Flint never sees the example orders, so a count means nothing to it. Say it repeats, and which copy was clicked.
+  const sameTag = [...el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`)].filter((e) => e.tagName === el.tagName);
+  const shown = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const repeatNote =
+    sameTag.length > 1 ? ` It is repeated by a loop; the seller clicked the copy showing "${shown}".` : "";
   return `(The seller selected the ${name} part of the slip. In the template it is: ${snippet}.${repeatNote})`;
 }
 
