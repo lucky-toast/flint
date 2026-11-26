@@ -1,13 +1,8 @@
-import type { TurnRequest, TurnResult } from "../core";
+import { SESSION_HEADER, type Status, type TurnRequest, type TurnResult } from "../core";
 import { accessHeaders } from "./access/access-code";
-
-/** GET /api/status, as the Worker answers it (Status in src/worker/index.ts). */
-export type Status = { live: boolean; access: boolean; budgetRemainingPct: number };
 
 // The browser's calls to the Worker.
 
-/** Must match SESSION_HEADER in src/worker/rate-limits.ts: the Worker rate-limits per session on it. */
-const SESSION_HEADER = "x-flint-session";
 const SESSION_KEY = "flint-session";
 
 /** A random id per browser tab, kept across reloads of that tab when sessionStorage is available. */
@@ -25,7 +20,10 @@ function tabSessionId(): string {
 
 const sessionId = tabSessionId();
 
-/** Sends one turn to Flint. A network or server failure comes back as "resting", never as a throw. */
+/**
+ * Sends one turn to Flint. A request the Worker refuses (400, 413) comes back as "too long"; any
+ * other network or server failure as "resting". Never a throw.
+ */
 export async function postTurn(request: TurnRequest): Promise<TurnResult> {
   try {
     const res = await fetch("/api/turn", {
@@ -33,6 +31,7 @@ export async function postTurn(request: TurnRequest): Promise<TurnResult> {
       headers: { "content-type": "application/json", [SESSION_HEADER]: sessionId, ...accessHeaders() },
       body: JSON.stringify(request),
     });
+    if (res.status === 400 || res.status === 413) return { type: "error", error: "too_long" };
     if (!res.ok) return { type: "error", error: "resting" };
     return (await res.json()) as TurnResult;
   } catch {

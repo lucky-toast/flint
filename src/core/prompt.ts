@@ -58,7 +58,7 @@ Template data:
 ${SCHEMA_DOC}
 
 This shop: ${shop.name} (${shop.platform}). Line item option names: ${options.length ? options.map((o) => `"${o}"`).join(", ") : "none"}.
-Available assets: ${assets}.
+Available assets: ${assets}, plus any images the seller uploaded, which the request lists.
 
 How to edit: call edit_template with edits applied in order. Each find must be copied character for character from the current template (including whitespace) and match it exactly once; include enough surrounding text to make it unique. Your edit is checked by rendering every example order; if it is rejected you will be told why, and the template stays unchanged.`;
 }
@@ -79,9 +79,12 @@ export type TurnInput = {
 /** How many past exchanges are sent to Ember. */
 export const HISTORY_LIMIT = 10;
 
-/** The user message: the working template, the recent conversation, then the request. */
-export function buildUserMessage({ templateSource, history, message, retryHint }: TurnInput): string {
+/** The user message: the working template, the seller's uploaded images, the recent conversation, then the request. */
+export function buildUserMessage({ templateSource, history, message, retryHint, uploadedAssets }: TurnInput): string {
   const parts = [`Current template:\n\`\`\`liquid\n${templateSource}\n\`\`\``];
+  if (uploadedAssets?.length) {
+    parts.push(`Images the seller uploaded (also available): ${uploadedAssets.map((n) => `assets.${n}`).join(", ")}.`);
+  }
   const recent = history.slice(-HISTORY_LIMIT);
   if (recent.length > 0) {
     parts.push(`Conversation so far:\n${recent.map((t) => `Seller: ${t.user}\nFlint: ${t.flint}`).join("\n")}`);

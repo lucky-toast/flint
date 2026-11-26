@@ -118,6 +118,14 @@ describe("POST /api/turn, budget", () => {
     expect(snapshot.reservedNanoUsd).toBe(0);
     expect(snapshot.spentNanoUsd).toBeGreaterThan(4000 * 500); // at least the output cap
   });
+
+  it.each([401, 429])("charges nothing when Ember refuses the call with HTTP %i", async (httpStatus) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("refused", { status: httpStatus }));
+
+    expect(await (await postTurn({})).json()).toEqual({ type: "error", error: "resting" });
+
+    expect(await globalBudget().snapshot()).toMatchObject({ spentNanoUsd: 0, reservedNanoUsd: 0 });
+  });
 });
 
 describe("GET /api/status, budget", () => {

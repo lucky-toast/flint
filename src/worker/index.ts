@@ -1,5 +1,14 @@
 // Flint Worker: serves the static app (via the ASSETS binding) and the /api/* routes.
-import { createEmberClient, DEFAULT_EMBER_BASE_URL, EmberError, runTurn, type Shop, type TurnInput, type TurnResult } from "../core";
+import {
+  createEmberClient,
+  DEFAULT_EMBER_BASE_URL,
+  EmberError,
+  runTurn,
+  type Shop,
+  type Status,
+  type TurnInput,
+  type TurnResult,
+} from "../core";
 import { shops } from "../data";
 import { hasAccessCode } from "./access";
 import { budgetedEmber, BudgetExhausted, GLOBAL_BUDGET } from "./budget";
@@ -8,9 +17,6 @@ import { ACCESS_CODE_NOTE, replayTurn } from "./replay";
 import { parseTurnRequest } from "./turn-request";
 
 export { BudgetDO } from "./budget";
-
-/** `access`: whether the request carried a valid access code. Without one, turns are replayed. */
-export type Status = { live: boolean; access: boolean; budgetRemainingPct: number };
 
 /** Live mode: the kill switch is on and a model key is configured. Each turn also needs the access code. */
 function isLive(env: Env): boolean {
@@ -23,7 +29,7 @@ function budget(env: Env) {
 
 async function status(request: Request, env: Env): Promise<Status> {
   const { remainingPct } = await budget(env).snapshot();
-  return { live: isLive(env), access: hasAccessCode(request, env), budgetRemainingPct: remainingPct };
+  return { live: isLive(env), access: await hasAccessCode(request, env), budgetRemainingPct: remainingPct };
 }
 
 /** Why a turn isn't served live. */
@@ -43,10 +49,20 @@ async function notLive(shop: Shop, input: TurnInput, reason: NotLiveReason): Pro
   return Response.json(fallback);
 }
 
+/** Turn bodies over this many bytes are refused before parsing. A real one is well under 60 KB. */
+const MAX_TURN_BODY_BYTES = 100_000;
+
+function tooLarge(): Response {
+  return Response.json({ error: "too_large", detail: `body must be at most ${MAX_TURN_BODY_BYTES} bytes` }, { status: 413 });
+}
+
 async function turn(request: Request, env: Env): Promise<Response> {
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_TURN_BODY_BYTES) return tooLarge();
   let body: unknown;
   try {
-    body = await request.json();
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_TURN_BODY_BYTES) return tooLarge();
+    body = JSON.parse(text);
   } catch {
     return Response.json({ error: "bad_request", detail: "body must be JSON" }, { status: 400 });
   }
@@ -57,7 +73,7 @@ async function turn(request: Request, env: Env): Promise<Response> {
   const shop = shops.find((s) => s.id === shopId);
   if (!shop) return Response.json({ error: "bad_request", detail: `unknown shop ${shopId}` }, { status: 400 });
 
-  if (!hasAccessCode(request, env)) return notLive(shop, input, "no_access_code");
+  if (!(await hasAccessCode(request, env))) return notLive(shop, input, "no_access_code");
   if (!isLive(env)) return notLive(shop, input, "off");
   if (!(await withinRateLimits(request, env))) return notLive(shop, input, "rate_limited");
 

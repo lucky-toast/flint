@@ -1,16 +1,21 @@
 // The access code: judges send it (in a request header) to use Flint live; everyone else gets replay.
-
-/** Must match ACCESS_CODE_HEADER in src/web/access/access-code.ts. */
-export const ACCESS_CODE_HEADER = "x-flint-access-code";
+import { ACCESS_CODE_HEADER } from "../core";
 
 /** Codes are capped so a client can't send an arbitrarily long header. */
 const MAX_CODE_LENGTH = 128;
 
-/** True when the request carries the configured access code. No configured code means nobody has one. */
-export function hasAccessCode(request: Request, env: Env): boolean {
+/**
+ * True when the request carries the configured access code. No configured code means nobody has one.
+ * Every request that carries a code counts against a per-IP limit (RATE_LIMIT_CODE) before the code
+ * is compared, so it can't be guessed quickly: past the limit, even the right code is refused for a while.
+ */
+export async function hasAccessCode(request: Request, env: Env): Promise<boolean> {
   const expected = env.ACCESS_CODE;
   const given = request.headers.get(ACCESS_CODE_HEADER);
   if (!expected || !given || given.length > MAX_CODE_LENGTH) return false;
+  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const { success } = await env.RATE_LIMIT_CODE.limit({ key: ip });
+  if (!success) return false;
   return timingSafeEqual(given, expected);
 }
 

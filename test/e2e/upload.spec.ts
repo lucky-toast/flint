@@ -55,7 +55,7 @@ test("Flint asks for a missing image, the seller uploads and names it, and Flint
 
   // The follow-up is a new turn carrying the conversation and the uploaded name, never the image.
   const [call] = await followUp.calls();
-  expect(call.instructions).toContain("assets.eco_badge");
+  expect(call.input[0].content).toContain("assets.eco_badge");
   expect(call.input[0].content).toContain("Seller: Add my eco-friendly badge to the header\nFlint: I need your eco-friendly badge image 🌱");
   expect(JSON.stringify(call)).not.toContain(PNG_BASE64);
 });
@@ -89,7 +89,7 @@ test("Try again on an edit that uses an uploaded image still offers that image t
   await expect(ed.working.locator("header img.leaf-after")).toHaveAttribute("src", `data:image/png;base64,${PNG_BASE64}`);
   await expect(ed.working.locator("img.uploaded-leaf_logo")).toHaveCount(0);
   const [call] = await retry.calls();
-  expect(call.instructions).toContain("assets.leaf_logo");
+  expect(call.input[0].content).toContain("assets.leaf_logo");
 });
 
 test("an uploaded image is kept across reloads for that shop only",async ({ page, ember }) => {
@@ -120,8 +120,8 @@ test("an uploaded image is kept across reloads for that shop only",async ({ page
   await expect(ed.flintSays("Your kiln stamp is next to the logo 🔥")).toBeVisible();
   await expect(ed.working.locator("header img.uploaded-kiln_stamp")).toHaveAttribute("src", `data:image/png;base64,${PNG_BASE64}`);
   const [call] = await later.calls();
-  expect(call.instructions).toContain("assets.kiln_stamp");
-  expect(call.instructions).not.toContain("other_shop_badge");
+  expect(call.input[0].content).toContain("assets.kiln_stamp");
+  expect(call.input[0].content).not.toContain("other_shop_badge");
 });
 
 test("an oversized image shows a clear error and is not stored", async ({ page, ember }) => {
@@ -143,5 +143,5 @@ test("an oversized image shows a clear error and is not stored", async ({ page, 
   await ed.send("Is my giant banner saved");
   await expect(ed.flintSays("Let's check 👀")).toBeVisible();
   const [call] = await later.calls();
-  expect(call.instructions).not.toContain("giant_banner");
+  expect(call.input[0].content).not.toContain("giant_banner");
 });
