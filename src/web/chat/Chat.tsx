@@ -4,10 +4,18 @@ import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
 import { FlintMessage } from "./FlintMessage";
 
-type Props = { turns: Turn[]; thinking: boolean; onSend: (message: string) => void; onUpload?: OnUpload };
+type Props = {
+  turns: Turn[];
+  thinking: boolean;
+  onSend: (message: string) => void;
+  /** The turn that offers Try again, if any. */
+  retryTurnId?: number;
+  onTryAgain?: () => void;
+  onUpload?: OnUpload;
+};
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, onUpload }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -22,12 +30,28 @@ export function Chat({ turns, thinking, onSend, onUpload }: Props) {
             <p>Hi! I'm Flint 👋 Tell me what you'd like to change on this slip.</p>
           </div>
         )}
-        {turns.map((turn) => (
-          <div key={turn.id} className={turn.undone ? "turn turn-undone" : "turn"} data-turn-id={turn.id}>
+        {turns.map((turn, i) => (
+          <div
+            key={turn.id}
+            className={turn.undone ? "turn turn-undone" : "turn"}
+            data-turn-id={turn.id}
+            data-undone={turn.undone ? "true" : undefined}
+          >
             <div className="message message-seller" data-author="seller">
               <p>{turn.message}</p>
             </div>
-            {turn.result && <FlintMessage result={turn.result} onUpload={onUpload} />}
+            {turn.result && (
+              // Chips stay live only on the latest turn: once the seller answers, they're spent.
+              <FlintMessage result={turn.result} onChoose={i === turns.length - 1 && !thinking ? onSend : undefined}
+                onUpload={onUpload}
+              />
+            )}
+            {turn.undone && <span className="turn-mark">Undone</span>}
+            {turn.id === retryTurnId && onTryAgain && !thinking && (
+              <button type="button" className="try-again" onClick={onTryAgain}>
+                Try again
+              </button>
+            )}
           </div>
         ))}
         {thinking && (

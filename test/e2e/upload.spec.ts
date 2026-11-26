@@ -60,7 +60,39 @@ test("Flint asks for a missing image, the seller uploads and names it, and Flint
   expect(JSON.stringify(call)).not.toContain(PNG_BASE64);
 });
 
-test("an uploaded image is kept across reloads for that shop only", async ({ page, ember }) => {
+test("Try again on an edit that uses an uploaded image still offers that image to Flint", async ({ page, ember }) => {
+  await ember.onRequest("Add my leaf logo beside the shop logo", assetCall("Please upload your leaf logo 🍃"));
+  await ember.onRequest(uploadFollowUp("leaf_logo"), editCall([headerImage("leaf_logo")], "Your leaf logo is beside the shop logo 🍃"));
+  // Longer than the follow-up's own match (the longest match wins), so it answers the retry.
+  const retry = await ember.script(
+    {
+      match: `${uploadFollowUp("leaf_logo")}\n\nThe seller undid your last attempt at this request and wants a different approach. Last time: Your leaf logo is beside the shop logo 🍃`,
+    },
+    uploadFollowUp("leaf_logo"),
+    editCall(
+      [{ find: "</header>", replace: '<img class="leaf-after" src="{{ assets.leaf_logo }}" alt=""></header>' }],
+      "Your leaf logo is at the end of the header now 🍃",
+    ),
+  );
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send("Add my leaf logo beside the shop logo");
+  const upload = uploadForm(page);
+  await upload.file.setInputFiles({ name: "leaf logo.png", mimeType: "image/png", buffer: PNG });
+  await upload.button.click();
+  await expect(ed.working.locator("header img.uploaded-leaf_logo")).toHaveCount(1);
+
+  await ed.tryAgainButton.click();
+
+  await expect(ed.flintSays("Your leaf logo is at the end of the header now 🍃")).toBeVisible();
+  await expect(ed.working.locator("header img.leaf-after")).toHaveAttribute("src", `data:image/png;base64,${PNG_BASE64}`);
+  await expect(ed.working.locator("img.uploaded-leaf_logo")).toHaveCount(0);
+  const [call] = await retry.calls();
+  expect(call.instructions).toContain("assets.leaf_logo");
+});
+
+test("an uploaded image is kept across reloads for that shop only",async ({ page, ember }) => {
   await ember.onRequest("Add my kiln stamp image", assetCall("Please upload your kiln stamp 🔥"));
   await ember.onRequest(uploadFollowUp("kiln_stamp"), replyCall("Got your kiln stamp 🔥"));
   const later = await ember.onRequest(

@@ -13,10 +13,12 @@ type Props = {
   assets?: Record<string, string>;
   /** Extra content under the heading, e.g. what-changed notes or warnings. */
   children?: ReactNode;
+  /** Content under the slip, e.g. the show-code toggle. */
+  footer?: ReactNode;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
@@ -29,6 +31,7 @@ export function SlipPane({ label, source, shop, order, paper, assets, children }
           This slip couldn't be rendered: {rendered.message}
         </p>
       )}
+      {footer}
     </section>
   );
 }
