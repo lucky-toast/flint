@@ -33,7 +33,9 @@ export type SessionAction =
   /** Steps the working slip back one version and marks that edit's turn undone. */
   | { type: "undid" }
   /** Try again: drops the turn's edit and reply, so the turn waits for Flint's new reply. */
-  | { type: "retried"; turnId: number };
+  | { type: "retried"; turnId: number }
+  /** The working slip was saved: it becomes the original that later edits compare against. */
+  | { type: "saved" };
 
 export function createSession(source: string): Session {
   return { original: source, versions: [{ source, turnId: null }], turns: [], nextTurnId: 1 };
@@ -63,7 +65,14 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       const turns = state.turns.map((t) => (t.id === action.turnId ? { id: t.id, message: t.message } : t));
       return { ...state, turns, versions: state.versions.slice(0, -1) };
     }
+    case "saved":
+      return { ...state, original: workingSource(state) };
   }
+}
+
+/** Whether the working slip differs from the original (as opened or last saved). */
+export function hasUnsavedChanges(state: Session): boolean {
+  return workingSource(state) !== state.original;
 }
 
 /** Whether Undo has a version to step back to (and Flint isn't mid-reply). */

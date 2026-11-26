@@ -23,6 +23,8 @@ export type SessionApi = {
   undo: () => void;
   /** Undoes the latest edit and asks Flint for a different approach to the same request. */
   tryAgain: () => void;
+  /** Marks the working slip as saved, so the original pane resets to it. */
+  saved: () => void;
 };
 
 export type SessionOptions = {
@@ -86,5 +88,7 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
     ask(turn.id, turn.message, flintText(turn.result));
   }, [apply, ask]);
 
-  return { state, thinking: !!pendingTurn(state), send, undo, tryAgain };
+  const saved = useCallback(() => apply({ type: "saved" }), [apply]);
+
+  return { state, thinking: !!pendingTurn(state), send, undo, tryAgain, saved };
 }
