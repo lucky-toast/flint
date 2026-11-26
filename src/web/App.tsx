@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Template } from "../core";
-import { builtInTemplates, shops } from "../data";
+import { builtInTemplates, REPLAY_CHIPS, REPLAY_SHOP_ID, shops } from "../data";
+import { AccessCode } from "./access/AccessCode";
+import { useAccess } from "./access/useAccess";
 import { Editor } from "./editor/Editor";
 import { ShopSwitcher } from "./shop/ShopSwitcher";
 import { TemplatePicker } from "./templates/TemplatePicker";
@@ -15,6 +17,9 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ kind: "editor", template: builtInTemplates[0]! });
   const shop = shops.find((s) => s.id === shopId) ?? shops[0]!;
   const saved = useSavedTemplates(shop);
+  const access = useAccess();
+  // Replay mode offers the scripted demo requests as chips, on the shop the recordings cover.
+  const replayChips = access.mode === "replay" && shop.id === REPLAY_SHOP_ID ? REPLAY_CHIPS : undefined;
 
   const switchShop = (id: string) => {
     setShopId(id);
@@ -36,6 +41,7 @@ export function App() {
             </button>
           </>
         )}
+        <AccessCode {...access} />
       </header>
       <main className="app-main">
         {screen.kind === "picker" ? (
@@ -46,7 +52,7 @@ export function App() {
             onCustomize={(template) => setScreen({ kind: "editor", template })}
           />
         ) : (
-          <Editor key={`${shop.id}/${screen.template.id}`} shop={shop} template={screen.template} />
+          <Editor key={`${shop.id}/${screen.template.id}`} shop={shop} template={screen.template} replayChips={replayChips} />
         )}
       </main>
     </div>

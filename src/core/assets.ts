@@ -14,6 +14,17 @@ export function isAssetName(value: unknown): value is string {
   return typeof value === "string" && ASSET_NAME_PATTERN.test(value);
 }
 
+/** The follow-up turn sent after an upload, so Flint carries on with the original request. */
+export function uploadFollowUp(name: string): string {
+  return `I've supplied the ${name} resource: it's now available as assets.${name}. Please carry on with my original request.`;
+}
+
+/** The uploaded name in an uploadFollowUp message, if the message is one (replay answers it). */
+export function uploadFollowUpName(message: string): string | undefined {
+  const match = /^I've supplied the ([a-z][a-z0-9_]{0,31}) resource: /.exec(message.trim());
+  return match?.[1];
+}
+
 /** The shop as the Worker sees it for a turn: its own assets plus placeholders for the uploaded names. */
 export function withUploadedAssets(shop: Shop, names: string[] | undefined): Shop {
   if (!names?.length) return shop;

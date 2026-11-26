@@ -2,12 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import { withAccessCode } from "./test/e2e/support/access";
 import { appPort, appURL, fakeEmberPort, fakeEmberURL, inspectorPort } from "./test/e2e/support/ports";
 
 // Browser tests run against `wrangler dev` serving the freshly built app, exactly as deployed,
 // with the Worker pointed at a fake Ember (test/e2e/support/fake-ember-server.ts) so CI spends nothing.
-// `--env e2e` (wrangler.jsonc) lifts the rate limits and loads .dev.vars.e2e, a placeholder key,
-// instead of a developer's .dev.vars. Each run gets a fresh budget in its own state directory.
+// `--env e2e` (wrangler.jsonc) lifts the rate limits and loads .dev.vars.e2e, a placeholder key and
+// access code, instead of a developer's .dev.vars. Each run gets a fresh budget in its own state directory.
 // Override E2E_PORT when several checkouts run browser tests at once.
 // The config is evaluated in every worker process too; only the main process needs the state dir.
 const stateDir = process.env.TEST_WORKER_INDEX === undefined ? mkdtempSync(join(tmpdir(), "flint-e2e-")) : "";
@@ -27,7 +28,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
-  use: { baseURL: appURL, trace: "retain-on-failure" },
+  // Every test starts with the e2e access code stored, so turns run live against the fake Ember;
+  // replay tests opt out (test/e2e/replay.spec.ts).
+  use: { baseURL: appURL, trace: "retain-on-failure", storageState: withAccessCode },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {

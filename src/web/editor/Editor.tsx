@@ -10,13 +10,18 @@ import { OrderPicker } from "./OrderPicker";
 import { ShowCode } from "./ShowCode";
 import { SlipPane } from "./SlipPane";
 
-type Props = { shop: Shop; template: Template };
+type Props = {
+  shop: Shop;
+  template: Template;
+  /** Replay mode's suggestion chips, when replay is on for this shop. */
+  replayChips?: string[];
+};
 
 /**
  * The editor for one shop + template: the original slip pinned beside the working slip, and the
  * chat with Flint. Mount it with a key per shop + template so switching starts a fresh session.
  */
-export function Editor({ shop, template }: Props) {
+export function Editor({ shop, template, replayChips }: Props) {
   const uploads = useUploadedAssets(shop);
   const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
   // After an upload, a follow-up turn tells Flint the image is there so it carries on.
@@ -64,6 +69,7 @@ export function Editor({ shop, template }: Props) {
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
         onUpload={upload}
+        replayChips={replayChips}
       />
     </div>
   );

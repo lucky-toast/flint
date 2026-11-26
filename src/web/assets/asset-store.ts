@@ -8,10 +8,8 @@ export const MAX_ASSET_BYTES = 200 * 1024;
 
 export type UploadResult = { ok: true; name: string } | { ok: false; error: string };
 
-/** The follow-up turn sent after an upload, so Flint carries on with the original request. */
-export function uploadFollowUp(name: string): string {
-  return `I've supplied the ${name} resource: it's now available as assets.${name}. Please carry on with my original request.`;
-}
+// The follow-up turn after an upload lives in core, where replay mode recognizes it too.
+export { uploadFollowUp } from "../../core";
 
 const storageKey =(shopId: string) => `flint-assets:${shopId}`;
 

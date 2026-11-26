@@ -14,7 +14,7 @@ describe("GET /api/status", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    expect(await res.json()).toEqual({ live: true, budgetRemainingPct: 100 });
+    expect(await res.json()).toEqual({ live: true, access: false, budgetRemainingPct: 100 });
   });
 
   it("reports live off when the kill switch is off", async () => {

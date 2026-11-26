@@ -1,7 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { builtInTemplates } from "../../src/data";
-import { randomIp } from "./client";
+import { turnHeaders } from "./client";
 import { commentary, editCall, fakeEmber, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
 
 const classic = builtInTemplates.find((t) => t.id === "classic")!.source;
@@ -14,7 +14,7 @@ function turn(body: Record<string, unknown>) {
   return exports.default.fetch("http://flint.test/api/turn", {
     method: "POST",
     // A fresh IP per request keeps these tests clear of the per-IP rate limit.
-    headers: { "content-type": "application/json", "cf-connecting-ip": randomIp() },
+    headers: turnHeaders(),
     body: JSON.stringify({ shopId: "kiln-and-co", templateSource: classic, history: [], ...body }),
   });
 }

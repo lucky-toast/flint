@@ -124,7 +124,7 @@ describe("GET /api/status, budget", () => {
   it("reports the remaining budget as a percentage of the cap", async () => {
     await globalBudget().reserve(CAP / 4);
 
-    expect(await status()).toEqual({ live: true, budgetRemainingPct: 75 });
+    expect(await status()).toMatchObject({ live: true, budgetRemainingPct: 75 });
   });
 
   it("reports 0% once the budget is spent", async () => {
