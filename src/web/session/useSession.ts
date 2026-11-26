@@ -25,12 +25,19 @@ export type SessionApi = {
   tryAgain: () => void;
 };
 
+export type SessionOptions = {
+  /** The names of the seller's uploaded images, read at send time so a just-uploaded one is included. */
+  uploadedAssetNames?: () => string[];
+};
+
 /** The editor session for one shop + template, wired to the Worker. */
-export function useSession(shop: Shop, template: Template): SessionApi {
+export function useSession(shop: Shop, template: Template, options: SessionOptions = {}): SessionApi {
   const [state, dispatch] = useReducer(sessionReducer, template.source, createSession);
   // The latest state, so callbacks can read it without being recreated on every change.
   const latest = useRef(state);
   latest.current = state;
+  const uploadedAssetNames = useRef(options.uploadedAssetNames);
+  uploadedAssetNames.current = options.uploadedAssetNames;
 
   // Applies an action now, so a double click can't act twice before React re-renders.
   const apply = useCallback((action: SessionAction) => {
@@ -48,6 +55,7 @@ export function useSession(shop: Shop, template: Template): SessionApi {
         history: historyForEmber(current),
         message,
         ...(retryHint ? { retryHint } : {}),
+        uploadedAssets: uploadedAssetNames.current?.() ?? [],
       };
       void postTurn(request).then((result) => apply({ type: "replied", turnId, result }));
     },

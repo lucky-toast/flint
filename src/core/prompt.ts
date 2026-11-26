@@ -72,6 +72,8 @@ export type TurnInput = {
   message: string;
   /** For "Try again": what Flint did last time, so it takes a different approach. */
   retryHint?: string;
+  /** Names of images the seller uploaded for this shop (the images never leave the browser). */
+  uploadedAssets?: string[];
 };
 
 /** How many past exchanges are sent to Ember. */

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Shop, Template } from "../../core";
+import { uploadFollowUp } from "../assets/asset-store";
+import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
 import { canUndo, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
@@ -15,7 +17,14 @@ type Props = { shop: Shop; template: Template };
  * chat with Flint. Mount it with a key per shop + template so switching starts a fresh session.
  */
 export function Editor({ shop, template }: Props) {
-  const session = useSession(shop, template);
+  const uploads = useUploadedAssets(shop);
+  const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
+  // After an upload, a follow-up turn tells Flint the image is there so it carries on.
+  const upload = async (file: File, name: string) => {
+    const result = await uploads.upload(file, name);
+    if (result.ok) session.send(uploadFollowUp(result.name));
+    return result;
+  };
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
 
@@ -28,16 +37,24 @@ export function Editor({ shop, template }: Props) {
         </button>
       </div>
       <div className="editor-panes">
-        <SlipPane label="Original" source={session.state.original} shop={shop} order={order} paper={template.paper} />
+        <SlipPane
+          label="Original"
+          source={session.state.original}
+          shop={shop}
+          order={order}
+          paper={template.paper}
+          assets={uploads.assets}
+        />
         <SlipPane
           label="Working"
           source={workingSource(session.state)}
           shop={shop}
           order={order}
           paper={template.paper}
+          assets={uploads.assets}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
-          <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} />
+          <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
         </SlipPane>
       </div>
       <Chat
@@ -46,6 +63,7 @@ export function Editor({ shop, template }: Props) {
         onSend={session.send}
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
+        onUpload={upload}
       />
     </div>
   );

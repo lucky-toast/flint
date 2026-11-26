@@ -5,6 +5,7 @@ export * from "./preview";
 export * from "./tools";
 export * from "./edits";
 export * from "./validate";
+export * from "./assets";
 export * from "./prompt";
 export * from "./ember";
 export * from "./turn";
