@@ -24,3 +24,6 @@ limit-test/results/
 # Claude Code: only project skills are committed
 .claude/*
 !.claude/skills/
+
+# Local turn logs (npm start) and their review pages
+logs/

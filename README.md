@@ -27,6 +27,10 @@ Restart `npm start` after editing `.dev.vars`.
 - **Replay** (default, no code): the header shows a Replay badge. On Kiln & Co., chips play recorded responses for the demo requests. Replay spends nothing.
 - **Live**: click "Have an access code?" in the header and enter your `ACCESS_CODE`. The badge switches to Live, and requests go to Muse Ember (capped at $3 in total by `TOKEN_BUDGET_USD` in `wrangler.jsonc`).
 
+## Turn logs
+
+`npm start` logs every turn and Ember call to `logs/<timestamp>/` (`calls.jsonl` with the raw requests and responses, `runs.jsonl` per turn), in the limit test's format. `npm run review` turns the latest folder into `review.html` with diffs and before/after slips. Logging is off in production.
+
 ## Hot reload
 
 Keep `npm start` running for the API, then run `npm run dev` in a second terminal and open the URL Vite prints (usually http://localhost:5173).

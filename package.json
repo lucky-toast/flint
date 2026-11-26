@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "npm run build && wrangler dev",
+    "start": "npm run build && node scripts/dev.mjs",
+    "review": "node scripts/review.mjs",
     "typecheck": "tsc -p tsconfig.web.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
     "cf-typegen": "wrangler types --strict-vars=false",
     "test": "vitest run",

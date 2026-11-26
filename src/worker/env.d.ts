@@ -5,6 +5,8 @@ interface FlintSecrets {
   EMBER_API_KEY?: string;
   /** Access code that unlocks live mode (used from the access-code ticket on). */
   ACCESS_CODE?: string;
+  /** "on" logs every turn and Ember call (src/worker/ember-log.ts). Only `npm start` sets it; never set in production. */
+  LOG_EMBER?: string;
 }
 
 interface Env extends FlintSecrets {}

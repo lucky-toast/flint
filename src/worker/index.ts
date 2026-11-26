@@ -12,6 +12,7 @@ import {
 import { REPLAY_SHOP_ID, shops } from "../data";
 import { hasAccessCode } from "./access";
 import { budgetedEmber, BudgetExhausted, GLOBAL_BUDGET } from "./budget";
+import { createTurnLog, loggingOn, type TurnLog } from "./ember-log";
 import { withinRateLimits } from "./rate-limits";
 import { ACCESS_CODE_NOTE, REPLAY_OTHER_SHOP, replayTurn } from "./replay";
 import { parseTurnRequest } from "./turn-request";
@@ -40,15 +41,16 @@ type NotLiveReason = "no_access_code" | "off" | "rate_limited" | "budget" | "emb
  * answered from replay, spending no budget. Anything else gets the access-code note when there's
  * no code, or rests.
  */
-async function notLive(shop: Shop, input: TurnInput, reason: NotLiveReason): Promise<Response> {
+async function notLive(shop: Shop, input: TurnInput, reason: NotLiveReason, log?: TurnLog): Promise<Response> {
   if (reason !== "no_access_code") console.log(`turn not live: ${reason}`);
   const replayed = await replayTurn(shop, input);
-  if (replayed) return Response.json(replayed);
   // The note points at the replay chips, which only Kiln & Co. shows; other shops are sent there.
   const accessNote = shop.id === REPLAY_SHOP_ID ? ACCESS_CODE_NOTE : REPLAY_OTHER_SHOP;
-  const fallback: TurnResult =
-    reason === "no_access_code" ? { type: "reply", message: accessNote } : { type: "error", error: "resting" };
-  return Response.json(fallback);
+  const result: TurnResult =
+    replayed ??
+    (reason === "no_access_code" ? { type: "reply", message: accessNote } : { type: "error", error: "resting" });
+  log?.finish(result, replayed ? "replay" : "not_live", reason);
+  return Response.json(result);
 }
 
 /** Turn bodies over this many bytes are refused before parsing. A real one is well under 60 KB. */
@@ -75,22 +77,30 @@ async function turn(request: Request, env: Env): Promise<Response> {
   const shop = shops.find((s) => s.id === shopId);
   if (!shop) return Response.json({ error: "bad_request", detail: `unknown shop ${shopId}` }, { status: 400 });
 
-  if (!(await hasAccessCode(request, env))) return notLive(shop, input, "no_access_code");
-  if (!isLive(env)) return notLive(shop, input, "off");
-  if (!(await withinRateLimits(request, env))) return notLive(shop, input, "rate_limited");
+  // Local runs (LOG_EMBER=on, set only by `npm start`) log every turn and Ember call; see ember-log.ts.
+  const log = loggingOn(env) ? createTurnLog(shop, input) : undefined;
+  if (!(await hasAccessCode(request, env))) return notLive(shop, input, "no_access_code", log);
+  if (!isLive(env)) return notLive(shop, input, "off", log);
+  if (!(await withinRateLimits(request, env))) return notLive(shop, input, "rate_limited", log);
 
   // Every Ember call reserves its worst case in the budget first and settles its actual usage after.
   const ember = budgetedEmber(
-    createEmberClient({ apiKey: env.EMBER_API_KEY!, baseUrl: env.MODEL_API_BASE_URL || DEFAULT_EMBER_BASE_URL }),
+    createEmberClient({
+      apiKey: env.EMBER_API_KEY!,
+      baseUrl: env.MODEL_API_BASE_URL || DEFAULT_EMBER_BASE_URL,
+      fetch: log?.fetch,
+    }),
     budget(env),
   );
   try {
-    return Response.json(await runTurn({ ember, shop, input }));
+    const result = await runTurn({ ember, shop, input });
+    log?.finish(result, "live");
+    return Response.json(result);
   } catch (err) {
-    if (err instanceof BudgetExhausted) return notLive(shop, input, "budget");
+    if (err instanceof BudgetExhausted) return notLive(shop, input, "budget", log);
     if (!(err instanceof EmberError)) throw err;
     console.error(err.message);
-    return notLive(shop, input, "ember_failed");
+    return notLive(shop, input, "ember_failed", log);
   }
 }
 
