@@ -1,0 +1,25 @@
+import type { TurnErrorCode, TurnResult } from "../../core";
+
+// What Flint says in the chat for each outcome. Cheerful, brief, never about code.
+
+export const ERROR_MESSAGES: Record<TurnErrorCode, string> = {
+  too_big: "That's a lot for one go 😅 Could you break it into smaller steps, one change at a time?",
+  invalid: "Hmm, I couldn't make that work for every order 🤔 Could you try rewording it?",
+  resting: "Flint is resting right now 😴 Please try again in a little while.",
+};
+
+/** The one line Flint shows for a turn's outcome (also what Ember sees of it in the history). */
+export function flintText(result: TurnResult): string {
+  switch (result.type) {
+    case "edit":
+      return result.summary;
+    case "ask":
+      return result.question;
+    case "asset":
+      return result.description;
+    case "reply":
+      return result.message;
+    case "error":
+      return ERROR_MESSAGES[result.error];
+  }
+}

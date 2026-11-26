@@ -27,6 +27,25 @@
     "TOKEN_BUDGET_USD": "3",
     // Muse Ember (Meta Responses API) base URL; tests and local runs can point it at a fake.
     "MODEL_API_BASE_URL": "https://api.meta.ai/v1"
+  },
+  "env": {
+    // Browser tests only (`wrangler dev --env e2e`, see playwright.config.ts). Every test request comes
+    // from 127.0.0.1, so the rate limits are lifted; bindings and vars aren't inherited, so they're
+    // repeated here. Playwright points MODEL_API_BASE_URL at the fake Ember with --var.
+    "e2e": {
+      "durable_objects": {
+        "bindings": [{ "name": "BUDGET", "class_name": "BudgetDO" }]
+      },
+      "ratelimits": [
+        { "name": "RATE_LIMIT_IP", "namespace_id": "1001", "simple": { "limit": 100000, "period": 60 } },
+        { "name": "RATE_LIMIT_SESSION", "namespace_id": "1002", "simple": { "limit": 100000, "period": 60 } }
+      ],
+      "vars": {
+        "LIVE_MODE": "on",
+        "TOKEN_BUDGET_USD": "3",
+        "MODEL_API_BASE_URL": "http://127.0.0.1:1/unset"
+      }
+    }
   }
   // Secrets (EMBER_API_KEY, ACCESS_CODE) live in .dev.vars locally; see .dev.vars.example.
 }
