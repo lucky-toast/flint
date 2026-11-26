@@ -2,7 +2,8 @@ import type { Edit } from "./tools";
 
 export type ApplyResult = { ok: true; source: string } | { ok: false; error: string };
 
-function countOccurrences(haystack: string, needle: string): number {
+/** How many times `needle` occurs in `haystack`, counted the way a find counts: without overlaps. */
+export function countOccurrences(haystack: string, needle: string): number {
   let count = 0;
   for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + needle.length)) count++;
   return count;

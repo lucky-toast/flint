@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LINE_ATTRIBUTE, selectionNote, uniqueQuote } from "../../core";
+import { quoteLineNear, selectionNote, uniqueQuote, type SelectedPart } from "../../core";
 import type { TurnSelection } from "../session/session";
-import { partAbove, partInside, partLine, partName, partsInside, sameCode, sections, slipRoot } from "./parts";
+import { partAbove, partInside, partLine, partName, partsInside, renderedFrom, sameCode, sections, slipRoot, UI_ATTRIBUTE } from "./parts";
 
 // Pointing at the working slip. The working slip renders an instrumented copy of the template
 // (every opening tag carries its source line), and this hook listens to its same-origin preview
@@ -9,19 +9,12 @@ import { partAbove, partInside, partLine, partName, partsInside, sameCode, secti
 // nothing runs inside it. Hover boxes, the name tag and the selected outline are styles and one
 // element injected into the preview document only, for the screen, never for print.
 
-/** The selected part, by where it comes from in the template. */
-type Picked = {
-  /** The template it was picked on (moved along on Undo and Redo). */
-  source: string;
-  line: number;
-  tag: string;
-  /** Which of the elements rendered from that line it is. */
-  index: number;
-  name: string;
-  repeats: boolean;
-};
+/**
+ * The selection, by where it comes from in the template (its source is moved along on Undo and
+ * Redo): its tag, and which of the elements rendered from its line with that tag it is.
+ */
+type SelectedPartRef = SelectedPart & { tag: string; index: number };
 
-const UI = "data-flint-ui";
 const PICKABLE = "data-flint-pickable";
 const HOVER = "data-flint-hover";
 const SELECTED = "data-flint-selected";
@@ -33,24 +26,23 @@ const FRAME_STYLE = `
   body[${POINTING}] [${PICKABLE}] { outline: 1px dashed rgb(232 89 12 / 0.45); outline-offset: 2px; }
   [${HOVER}] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
   [${SELECTED}] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.07) !important; }
-  [${UI}] { position: absolute; z-index: 2147483647; margin: 0; background: ${ACCENT}; color: #fff;
+  [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: ${ACCENT}; color: #fff;
     font: 600 15px/1 system-ui, sans-serif; padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 }
-@media print { [${UI}] { display: none !important; } }
+@media print { [${UI_ATTRIBUTE}] { display: none !important; } }
 `;
 
-function elementOf(doc: Document, picked: Picked): Element | null {
-  const all = [...doc.querySelectorAll(`[${LINE_ATTRIBUTE}="${picked.line}"]`)].filter((e) => e.tagName === picked.tag);
-  return all[picked.index] ?? all[0] ?? null;
+function elementOf(doc: Document, selectedPart: SelectedPartRef): Element | null {
+  const all = renderedFrom(doc, selectedPart.line, selectedPart.tag);
+  return all[selectedPart.index] ?? all[0] ?? null;
 }
 
-/** The picked part's place in a new template, if its code is still there. */
-function moved(picked: Picked, source: string): Picked | null {
-  if (picked.source === source) return picked;
-  const quote = uniqueQuote(picked.source, picked.line) ?? picked.source.split("\n")[picked.line - 1] ?? "";
-  const at = quote ? source.indexOf(quote) : -1;
-  if (at === -1) return null;
-  return { ...picked, source, line: source.slice(0, at).split("\n").length };
+/** The selection's place in a new template, if its code is still there: the look-alike nearest its old line. */
+function moved(selectedPart: SelectedPartRef, source: string): SelectedPartRef | null {
+  if (selectedPart.source === source) return selectedPart;
+  const quote = uniqueQuote(selectedPart.source, selectedPart.line) ?? selectedPart.source.split("\n")[selectedPart.line - 1] ?? "";
+  const line = quote ? quoteLineNear(source, quote, selectedPart.line) : undefined;
+  return line === undefined ? null : { ...selectedPart, source, line };
 }
 
 function clearMark(doc: Document, attr: string) {
@@ -70,10 +62,10 @@ export type SlipSelectionApi = {
 
 /** Selection on the working slip, whose template is `source`. */
 export function useSlipSelection(source: string): SlipSelectionApi {
-  const [picked, setPicked] = useState<Picked | null>(null);
+  const [selectedPart, setSelectedPart] = useState<SelectedPartRef | null>(null);
   const [doc, setDoc] = useState<Document | null>(null);
-  const pickedRef = useRef(picked);
-  pickedRef.current = picked;
+  const selectedRef = useRef(selectedPart);
+  selectedRef.current = selectedPart;
   const sourceRef = useRef(source);
   sourceRef.current = source;
   /** The element under the cursor, so the hover box can follow a click without a mouse move. */
@@ -81,30 +73,29 @@ export function useSlipSelection(source: string): SlipSelectionApi {
 
   // Undo, Redo and the like change the template without clearing the selection: follow its code.
   useEffect(() => {
-    setPicked((current) => (current ? moved(current, source) : current));
+    setSelectedPart((current) => (current ? moved(current, source) : current));
   }, [source]);
 
-  const clear = useCallback(() => setPicked(null), []);
+  const clear = useCallback(() => setSelectedPart(null), []);
 
-  const pick = useCallback((el: Element) => {
+  const selectPart = useCallback((el: Element) => {
     const line = partLine(el);
     if (!line) return;
-    const copies = sameCode(el);
-    setPicked({
+    setSelectedPart({
       source: sourceRef.current,
       line,
       tag: el.tagName,
-      index: copies.indexOf(el),
+      index: renderedFrom(el.ownerDocument, line, el.tagName).indexOf(el),
       name: partName(el),
-      repeats: copies.length > 1,
+      repeats: sameCode(el).length > 1,
     });
   }, []);
 
   /** The part a click on `el` would select: one finer inside the selection, else its section. */
-  const targetFor = useCallback((d: Document, el: Element | null): Element | null => {
+  const partToSelect = useCallback((d: Document, el: Element | null): Element | null => {
     const root = slipRoot(d);
     if (!root || !el) return null;
-    const current = pickedRef.current;
+    const current = selectedRef.current;
     const selected = current ? elementOf(d, current) : null;
     if (selected && (el === selected || selected.contains(el))) return partInside(el, selected) ?? selected;
     return partInside(el, root);
@@ -113,8 +104,8 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   const showHover = useCallback(
     (d: Document) => {
       clearMark(d, HOVER);
-      const tag = d.querySelector<HTMLElement>(`[${UI}]`);
-      const target = targetFor(d, under.current);
+      const tag = d.querySelector<HTMLElement>(`[${UI_ATTRIBUTE}]`);
+      const target = partToSelect(d, under.current);
       if (!tag) return;
       if (!target) {
         tag.hidden = true;
@@ -128,7 +119,7 @@ export function useSlipSelection(source: string): SlipSelectionApi {
       tag.style.top = `${Math.max(0, box.top + view.scrollY - 26)}px`;
       tag.hidden = false;
     },
-    [targetFor],
+    [partToSelect],
   );
   const showHoverRef = useRef(showHover);
   showHoverRef.current = showHover;
@@ -140,7 +131,7 @@ export function useSlipSelection(source: string): SlipSelectionApi {
       // In the body, after the slip, so the head keeps only the page setup.
       d.body.appendChild(style);
       const tag = d.createElement("div");
-      tag.setAttribute(UI, "");
+      tag.setAttribute(UI_ATTRIBUTE, "");
       tag.setAttribute("role", "tooltip");
       tag.hidden = true;
       d.body.appendChild(tag);
@@ -156,22 +147,22 @@ export function useSlipSelection(source: string): SlipSelectionApi {
         showHoverRef.current(d);
       });
       d.addEventListener("click", (e) => {
-        const target = targetFor(d, e.target as Element);
-        const current = pickedRef.current;
-        if (!target || (current && target === elementOf(d, current))) setPicked(null);
-        else pick(target);
+        const target = partToSelect(d, e.target as Element);
+        const current = selectedRef.current;
+        if (!target || (current && target === elementOf(d, current))) setSelectedPart(null);
+        else selectPart(target);
       });
 
       under.current = null;
       // A fresh render of a part that's gone (or a render without source lines) drops the selection.
-      const current = pickedRef.current;
-      if (current && !elementOf(d, current)) setPicked(null);
+      const current = selectedRef.current;
+      if (current && !elementOf(d, current)) setSelectedPart(null);
       setDoc(d);
     },
-    [targetFor, pick],
+    [partToSelect, selectPart],
   );
 
-  const selected = doc && picked ? elementOf(doc, picked) : null;
+  const selected = doc && selectedPart ? elementOf(doc, selectedPart) : null;
   const root = doc ? slipRoot(doc) : null;
 
   // Mark the selection and what can be selected now: the sections, and the parts one level inside the selection.
@@ -187,12 +178,12 @@ export function useSlipSelection(source: string): SlipSelectionApi {
 
   const bigger = selected && root ? partAbove(selected, root) : null;
   const selectBigger = useCallback(() => {
-    if (bigger) pick(bigger);
-  }, [bigger, pick]);
+    if (bigger) selectPart(bigger);
+  }, [bigger, selectPart]);
 
   const selection = useMemo(
-    () => (picked ? { name: picked.name, note: selectionNote(picked) } : undefined),
-    [picked],
+    () => (selectedPart ? { name: selectedPart.name, note: selectionNote(selectedPart) } : undefined),
+    [selectedPart],
   );
 
   return { selection, canSelectBigger: !!bigger, selectBigger, clear, onDocument };

@@ -7,9 +7,12 @@ import { LINE_ATTRIBUTE } from "../../core";
 /** Words kept upper-case in part names ("SKU column"). */
 const ACRONYMS = new Set(["sku", "id", "url", "qr"]);
 
-/** The slip's root: the first element in the body that isn't a <style>. */
+/** The attribute on the elements the app injects into the preview document (the name tag). */
+export const UI_ATTRIBUTE = "data-flint-ui";
+
+/** The slip's root: the first element in the body that isn't a <style> or the app's own. */
 export function slipRoot(doc: Document): Element | null {
-  return [...doc.body.children].find((el) => el.tagName !== "STYLE" && !el.hasAttribute("data-flint-ui")) ?? null;
+  return [...doc.body.children].find((el) => el.tagName !== "STYLE" && !el.hasAttribute(UI_ATTRIBUTE)) ?? null;
 }
 
 function isPart(el: Element): boolean {
@@ -39,7 +42,7 @@ export function partAbove(el: Element, root: Element): Element | null {
 
 /** The sections: the outermost parts inside the root (normally the root's direct children). */
 export function sections(root: Element): Element[] {
-  return [...root.querySelectorAll("[class]")].filter((el) => partInside(el, root) === el);
+  return partsInside(root);
 }
 
 /** The parts exactly one level inside `outer`. */
@@ -66,9 +69,17 @@ export function partLine(el: Element): number | undefined {
   return Number.isInteger(line) && line > 0 ? line : undefined;
 }
 
-/** The elements rendered from the same template line and tag as `el`, in document order. */
+/** The elements rendered from template line `line` with tag name `tag`, in document order. */
+export function renderedFrom(doc: Document, line: number, tag: string): Element[] {
+  return [...doc.querySelectorAll(`[${LINE_ATTRIBUTE}="${line}"]`)].filter((e) => e.tagName === tag);
+}
+
+/**
+ * The elements rendered from the same template code as `el` (its line, tag and class), in
+ * document order: more than one when the template repeats it.
+ */
 export function sameCode(el: Element): Element[] {
-  const line = el.getAttribute(LINE_ATTRIBUTE);
+  const line = partLine(el);
   if (!line) return [el];
-  return [...el.ownerDocument.querySelectorAll(`[${LINE_ATTRIBUTE}="${line}"]`)].filter((e) => e.tagName === el.tagName);
+  return renderedFrom(el.ownerDocument, line, el.tagName).filter((e) => e.getAttribute("class") === el.getAttribute("class"));
 }

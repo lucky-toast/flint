@@ -159,6 +159,28 @@ test("of two look-alike sections, clicking the second sends code that matches on
       <h2>Return to</h2>`);
 });
 
+test("a part beside a different sibling on its line isn't told as repeated", async ({ page, ember }) => {
+  const badges = `  <p class="badges"><span class="badge-eco">Eco</span><span class="badge-local">Local</span></p>
+
+  {% assign items`;
+  await ember.onRequest("Add badges (siblings)", editCall([{ find: "  {% assign items", replace: badges }], "Added badges 🏷️"));
+  const second = await ember.onRequest("Make this green (siblings)", replyCall("Green it is"));
+  const ed = editor(page);
+  await page.goto("/");
+  await ed.send("Add badges (siblings)");
+  await expect(ed.working.getByText("Eco")).toBeVisible();
+
+  await ed.working.locator(".badge-eco").click();
+  await ed.working.locator(".badge-eco").click();
+  await expect(ed.selectionChip).toHaveText(/📍 About: Badge eco/);
+  await ed.send("Make this green (siblings)");
+  await expect(ed.flintSays("Green it is")).toBeVisible();
+
+  const message = await userMessage(second);
+  expect(message).toContain('The seller selected the "Badge eco" part');
+  expect(message).not.toContain("The template repeats it");
+});
+
 test("the selection survives a clarification, clears after an edit and on an order switch, and Undo leaves it", async ({ page, ember }) => {
   await ember.onRequest("Change this (lifetime)", askCall("Bigger or bolder?", ["Bigger (lifetime)", "Bolder (lifetime)"]));
   const answer = await ember.onRequest(

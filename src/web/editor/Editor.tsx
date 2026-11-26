@@ -34,11 +34,11 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   // An accepted edit re-renders the working slip, so the selection clears (it's in the history).
   const session = useSession(shop, template, {
     uploadedAssetNames: uploads.uploadedNames,
-    onEdited: () => pointing.clear(),
+    onEdited: () => slipSelection.clear(),
   });
-  const pointing = useSlipSelection(workingSource(session.state));
+  const slipSelection = useSlipSelection(workingSource(session.state));
   /** Every message goes with what the seller pointed at; a question back from Flint keeps it. */
-  const send = (message: string) => session.send(message, pointing.selection);
+  const send = (message: string) => session.send(message, slipSelection.selection);
   const unsaved = hasUnsavedChanges(session.state);
   useEffect(() => onUnsavedChange?.(unsaved), [unsaved, onUnsavedChange]);
   // After an upload, a follow-up turn tells Flint the image is there so it carries on.
@@ -58,7 +58,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           orderId={order.id}
           onChange={(id) => {
             // Another order may not have the part, so the selection clears.
-            pointing.clear();
+            slipSelection.clear();
             setOrderId(id);
           }}
         />
@@ -95,7 +95,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           order={order}
           paper={template.paper}
           assets={uploads.assets}
-          onDocument={pointing.onDocument}
+          onDocument={slipSelection.onDocument}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
@@ -112,10 +112,10 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         replayChips={replayChips}
         selectionChip={
           <SelectionChip
-            name={pointing.selection?.name}
-            canSelectBigger={pointing.canSelectBigger}
-            onSelectBigger={pointing.selectBigger}
-            onClear={pointing.clear}
+            name={slipSelection.selection?.name}
+            canSelectBigger={slipSelection.canSelectBigger}
+            onSelectBigger={slipSelection.selectBigger}
+            onClear={slipSelection.clear}
           />
         }
       />

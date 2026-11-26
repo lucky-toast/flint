@@ -34,5 +34,5 @@ _Avoid_: element, region (in anything the seller reads)
 A top-level part of the slip, such as the header, ship-to, items table, totals or thank-you line. The first click on the slip selects a section; each further click inside the selection goes one part finer.
 
 **Selection**:
-The part the seller picked on the working slip. Flint is told only enough to find it in the template: the part's name and its template source, quoted verbatim and extended until it occurs once. It never describes the rendered slip, since Flint never sees the example orders. It travels with the turn, stays in the history Flint sees, and clears whenever the slip re-renders or the example order changes.
+The part the seller picked on the working slip. Flint is told only enough to find it in the template: the part's name and its template source, quoted verbatim and extended until it occurs once. It never describes the rendered slip, since Flint never sees the example orders. It travels with the turn, stays in the history Flint sees, and clears when one of Flint's edits lands on the working slip or the example order changes. Undo, Redo and other re-renders keep it on its template code.
 _Avoid_: highlight, focus
