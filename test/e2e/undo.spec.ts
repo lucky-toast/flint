@@ -106,3 +106,47 @@ test("Try again replaces Flint's previous reply with a new one and sends the ret
   await ed.undoButton.click();
   await expect(ed.working.getByText(THANK_YOU)).toBeVisible();
 });
+
+test("a failed Try again keeps the previous edit and says why", async ({ page, ember }) => {
+  const request = "Warm up the footer (failed try again)";
+  await ember.onRequest(
+    request,
+    editCall([{ find: "Thank you for supporting", replace: "Warm thanks for supporting" }], "Warmed up the footer ☀️"),
+  );
+  await ember.script({ match: "wants a different approach. Last time: Warmed up the footer ☀️" }, request, emberDown());
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send(request);
+  await expect(ed.working.getByText("Warm thanks for supporting")).toBeVisible();
+  await ed.tryAgainButton.click();
+
+  await expect(ed.flintSays("Flint is resting")).toBeVisible();
+  await expect(ed.flintSays("Warmed up the footer ☀️")).toBeVisible();
+  await expect(ed.working.getByText("Warm thanks for supporting")).toBeVisible();
+  // The kept edit can still be undone.
+  await ed.undoButton.click();
+  await expect(ed.working.getByText(THANK_YOU)).toBeVisible();
+});
+
+test("Try again works after a summary longer than a message", async ({ page, ember }) => {
+  const request = "Make the footer cosy (long summary)";
+  const summary = `Made the footer cosy 🧣 ${"and very snug ".repeat(45)}TAIL-OF-SUMMARY`;
+  await ember.onRequest(request, editCall([{ find: "Thank you for supporting", replace: "Cosy thanks for supporting" }], summary));
+  const retry = await ember.script(
+    { match: "wants a different approach. Last time: Made the footer cosy 🧣" },
+    request,
+    editCall([{ find: "Thank you for supporting", replace: "Snug thanks for supporting" }], "Snug instead 🛌"),
+  );
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send(request);
+  await expect(ed.working.getByText("Cosy thanks for supporting")).toBeVisible();
+  await ed.tryAgainButton.click();
+
+  await expect(ed.flintSays("Snug instead 🛌")).toBeVisible();
+  await expect(ed.working.getByText("Snug thanks for supporting")).toBeVisible();
+  const [call] = await retry.calls();
+  expect(call.input[0].content).not.toContain("TAIL-OF-SUMMARY");
+});

