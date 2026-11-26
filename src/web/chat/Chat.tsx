@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Turn } from "../session/session";
+import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
 import { FlintMessage } from "./FlintMessage";
 
@@ -10,10 +11,11 @@ type Props = {
   /** The turn that offers Try again, if any. */
   retryTurnId?: number;
   onTryAgain?: () => void;
+  onUpload?: OnUpload;
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -40,7 +42,9 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain }: Props
             </div>
             {turn.result && (
               // Chips stay live only on the latest turn: once the seller answers, they're spent.
-              <FlintMessage result={turn.result} onChoose={i === turns.length - 1 && !thinking ? onSend : undefined} />
+              <FlintMessage result={turn.result} onChoose={i === turns.length - 1 && !thinking ? onSend : undefined}
+                onUpload={onUpload}
+              />
             )}
             {turn.undone && <span className="turn-mark">Undone</span>}
             {turn.id === retryTurnId && onTryAgain && !thinking && (

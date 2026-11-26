@@ -1,3 +1,4 @@
+import { withUploadedAssets } from "./assets";
 import { applyEdits } from "./edits";
 import {
   firstFunctionCall,
@@ -50,7 +51,8 @@ export type RunTurnOptions = {
   onUsage?: (usage: Usage) => void | Promise<void>;
 };
 
-export async function runTurn({ ember, shop, input, onUsage }: RunTurnOptions): Promise<TurnResult> {
+export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurnOptions): Promise<TurnResult> {
+  const shop = withUploadedAssets(baseShop, input.uploadedAssets);
   const instructions = buildInstructions(shop);
   const items: InputItem[] = [{ role: "user", content: buildUserMessage(input) }];
 
