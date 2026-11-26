@@ -18,8 +18,8 @@
 // Finding that line: the working slip renders an instrumented copy of the template where every
 // opening tag carries data-flint-line="N" (preview only: never saved, never sent to Flint). A click
 // knows its exact source line; if that line's text appears more than once in the template, the
-// quote grows by following lines until it is unique (the same rule as Flint's find/replace). When one
-// line renders many elements (a loop), Flint is told it repeats.
+// quote grows by following lines until it is unique (the same rule as Flint's find/replace).
+// Flint sees only the template (never the example orders), so nothing about the rendered slip is sent.
 //
 // A seeded saved template, "Look-alike test (prototype)" for Kiln & Co., has two identical
 // <section class="addresses"><div class="ship-to"> blocks to try this on.
@@ -172,12 +172,7 @@ function sourceContext(el: Element, source: string): string {
     .map((l) => l.trim())
     .join(" ⏎ ")
     .slice(0, 260);
-  // Flint never sees the example orders, so a count means nothing to it. Say it repeats, and which copy was clicked.
-  const sameTag = [...el.ownerDocument.querySelectorAll(`[data-flint-line="${n}"]`)].filter((e) => e.tagName === el.tagName);
-  const shown = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
-  const repeatNote =
-    sameTag.length > 1 ? ` It is repeated by a loop; the seller clicked the copy showing "${shown}".` : "";
-  return `(The seller selected the ${name} part of the slip. In the template it is: ${snippet}.${repeatNote})`;
+  return `(The seller selected the ${name} part of the slip. In the template it is: ${snippet})`;
 }
 
 function clearMark(doc: Document, attr: string) {
