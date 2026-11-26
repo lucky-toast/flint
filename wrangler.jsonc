@@ -14,7 +14,9 @@
     // Kill switch: anything other than "on" turns live mode off.
     "LIVE_MODE": "on",
     // Global Muse Ember budget in US dollars.
-    "TOKEN_BUDGET_USD": "3"
+    "TOKEN_BUDGET_USD": "3",
+    // Muse Ember (Meta Responses API) base URL; tests and local runs can point it at a fake.
+    "MODEL_API_BASE_URL": "https://api.meta.ai/v1"
   }
   // Secrets (EMBER_API_KEY, ACCESS_CODE) live in .dev.vars locally; see .dev.vars.example.
 }
