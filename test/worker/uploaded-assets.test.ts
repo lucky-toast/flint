@@ -30,13 +30,16 @@ describe("POST /api/turn, uploaded assets", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("lists uploaded asset names beside the shop's own in the system prompt", async () => {
-    const calls = fakeEmber(badgeEdit());
+  it("lists uploaded asset names in the user message, keeping the system prompt fixed per shop", async () => {
+    const calls = fakeEmber(badgeEdit(), badgeEdit());
 
     await postTurn({ message: "Add my eco-friendly badge", uploadedAssets: ["eco_badge"] });
+    await postTurn({ message: "Add my eco-friendly badge" });
 
+    expect(calls[0]!.body.instructions).toBe(calls[1]!.body.instructions);
     expect(calls[0]!.body.instructions).toContain("assets.logo");
-    expect(calls[0]!.body.instructions).toContain("assets.eco_badge");
+    expect(calls[0]!.body.instructions).not.toContain("eco_badge");
+    expect(calls[0]!.body.input[0].content).toContain("assets.eco_badge");
   });
 
   it("still rejects an asset that is neither the shop's nor uploaded", async () => {

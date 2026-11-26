@@ -5,7 +5,10 @@ import type { TurnErrorCode, TurnResult } from "../../core";
 export const ERROR_MESSAGES: Record<TurnErrorCode, string> = {
   too_big: "That's a lot for one go 😅 Could you break it into smaller steps, one change at a time?",
   invalid: "Hmm, I couldn't make that work for every order 🤔 Could you try rewording it?",
-  resting: "Flint is resting right now 😴 Please try again in a little while.",
+  // The Worker still answers the scripted demo requests from replay while live is resting.
+  resting:
+    "Flint is resting right now 😴 Please try again in a little while. Meanwhile, the demo requests on Kiln & Co. still work, like “Sort items by quantity, then SKU”.",
+  too_long: "That request was too long for me 😅 Could you try something shorter?",
 };
 
 /** The one line Flint shows for a turn's outcome (also what Ember sees of it in the history). */

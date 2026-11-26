@@ -1,4 +1,4 @@
-import { HISTORY_LIMIT, type HistoryTurn, type TurnResult } from "../../core";
+import { HISTORY_LIMIT, type HistoryTurn, type TurnErrorCode, type TurnResult } from "../../core";
 import { flintText } from "./flint-text";
 
 // The editor's client state for one shop + template: the version stack and the chat, as turns.
@@ -13,6 +13,10 @@ export type Turn = {
   result?: TurnResult;
   /** Undone turns stay in the chat (marked) but are dropped from the history sent to Ember. */
   undone?: boolean;
+  /** While Try again is pending: the edit and reply it replaces, restored if the retry fails. */
+  retrying?: { result: TurnResult; version: Version };
+  /** A failed Try again: the edit was kept, and Flint says why the retry didn't work. */
+  note?: TurnErrorCode;
 };
 
 /** A template source on the stack and the turn whose edit produced it (null for the starting point). */
@@ -32,7 +36,10 @@ export type SessionAction =
   | { type: "replied"; turnId: number; result: TurnResult }
   /** Steps the working slip back one version and marks that edit's turn undone. */
   | { type: "undid" }
-  /** Try again: drops the turn's edit and reply, so the turn waits for Flint's new reply. */
+  /**
+   * Try again: sets the turn's edit and reply aside, so the turn waits for Flint's new reply. If
+   * that reply is an error, the edit and reply come back and the error shows as a note.
+   */
   | { type: "retried"; turnId: number }
   /** The working slip was saved: it becomes the original that later edits compare against. */
   | { type: "saved" };
@@ -49,7 +56,14 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
     }
     case "replied": {
       const { turnId, result } = action;
-      const turns = state.turns.map((t) => (t.id === turnId ? { ...t, result } : t));
+      const retried = state.turns.find((t) => t.id === turnId)?.retrying;
+      if (retried && result.type === "error") {
+        const turns = state.turns.map((t) =>
+          t.id === turnId ? { id: t.id, message: t.message, result: retried.result, note: result.error } : t,
+        );
+        return { ...state, turns, versions: [...state.versions, retried.version] };
+      }
+      const turns = state.turns.map((t) => (t.id === turnId ? { id: t.id, message: t.message, result } : t));
       const versions =
         result.type === "edit" ? [...state.versions, { source: result.templateSource, turnId }] : state.versions;
       return { ...state, turns, versions };
@@ -61,8 +75,10 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       return { ...state, turns, versions: state.versions.slice(0, -1) };
     }
     case "retried": {
-      if (pendingTurn(state) || retryableTurn(state)?.id !== action.turnId) return state;
-      const turns = state.turns.map((t) => (t.id === action.turnId ? { id: t.id, message: t.message } : t));
+      const turn = retryableTurn(state);
+      if (pendingTurn(state) || turn?.id !== action.turnId) return state;
+      const retrying = { result: turn.result, version: state.versions[state.versions.length - 1]! };
+      const turns = state.turns.map((t) => (t.id === action.turnId ? { id: t.id, message: t.message, retrying } : t));
       return { ...state, turns, versions: state.versions.slice(0, -1) };
     }
     case "saved":

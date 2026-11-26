@@ -21,7 +21,10 @@ export type SessionApi = {
   send: (message: string) => void;
   /** Steps the working slip back one version. Ignored when there's nothing to undo. */
   undo: () => void;
-  /** Undoes the latest edit and asks Flint for a different approach to the same request. */
+  /**
+   * Sets the latest edit aside and asks Flint for a different approach to the same request. If
+   * Flint can't, the edit comes back and Flint's error shows as a note.
+   */
   tryAgain: () => void;
   /** Marks the working slip as saved, so the original pane resets to it. */
   saved: () => void;
@@ -85,7 +88,8 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
     if (!turn || pendingTurn(current)) return;
     apply({ type: "retried", turnId: turn.id });
     // The retried turn is pending now, so it's absent from the history, and its edit is off the stack.
-    ask(turn.id, turn.message, flintText(turn.result));
+    // The Worker takes hints up to a message's length; a long summary is cut to fit.
+    ask(turn.id, turn.message, flintText(turn.result).slice(0, MAX_MESSAGE_LENGTH));
   }, [apply, ask]);
 
   const saved = useCallback(() => apply({ type: "saved" }), [apply]);

@@ -1,6 +1,6 @@
 import { exports } from "cloudflare:workers";
 import { builtInTemplates } from "../../src/data";
-import { ACCESS_CODE_HEADER } from "../../src/worker/access";
+import { ACCESS_CODE_HEADER } from "../../src/core";
 
 // Helpers for calling the Worker's API the way the browser does.
 

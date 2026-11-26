@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   costNanoUsd,
+  EmberError,
   NANO_USD_PER_USD,
   requestBody,
   worstCaseNanoUsd,
@@ -25,7 +26,7 @@ export type BudgetSnapshot = {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
-  /** What's left of the cap after spending and open reservations, 0â€“100. */
+  /** What's left of the cap after spending and open reservations, 0-100. */
   remainingPct: number;
 };
 
@@ -102,10 +103,18 @@ export class BudgetExhausted extends Error {
 
 type BudgetStub = Pick<BudgetDO, "reserve" | "settle">;
 
+const NO_USAGE: Usage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 };
+
+/** An HTTP 4xx from Ember: the request was refused before any model work, so nothing was spent. */
+function isRefusal(err: unknown): boolean {
+  return err instanceof EmberError && err.httpStatus !== undefined && err.httpStatus >= 400 && err.httpStatus < 500;
+}
+
 /**
  * Wraps an Ember client so every call reserves its worst-case cost before it goes out and settles
- * its actual usage when it returns. A failed call keeps its whole reservation, since what Ember
- * charged for it is unknown.
+ * its actual usage when it returns. A call Ember definitely refused (HTTP 4xx, e.g. a bad key or
+ * its own rate limit) settles at zero. Any other failed call keeps its whole reservation, since
+ * what Ember charged for it is unknown.
  */
 export function budgetedEmber(ember: EmberClient, budget: BudgetStub): EmberClient {
   return {
@@ -117,6 +126,9 @@ export function budgetedEmber(ember: EmberClient, budget: BudgetStub): EmberClie
         const response = await ember.respond(request);
         usage = response.usage;
         return response;
+      } catch (err) {
+        if (isRefusal(err)) usage = NO_USAGE;
+        throw err;
       } finally {
         await budget.settle(reservation.id, usage);
       }

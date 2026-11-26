@@ -1,8 +1,6 @@
 // The judge's access code, kept in this browser and sent with every API call. Without a valid one,
 // the Worker answers turns from replay.
-
-/** Must match ACCESS_CODE_HEADER in src/worker/access.ts. */
-export const ACCESS_CODE_HEADER = "x-flint-access-code";
+import { ACCESS_CODE_HEADER } from "../../core";
 
 const STORAGE_KEY = "flint-access-code";
 

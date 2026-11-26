@@ -1,4 +1,4 @@
-import { isAssetName, MAX_UPLOADED_ASSETS } from "../../core";
+import { isAssetName, MAX_ASSET_NAME_LENGTH, MAX_UPLOADED_ASSETS } from "../../core";
 
 // Seller-uploaded images, kept as data URLs in localStorage, one entry per shop. They never leave
 // the browser: turns send only their names.
@@ -32,7 +32,7 @@ export function loadUploadedAssets(shopId: string): Record<string, string> {
 /** Why a name can't be used for a new upload, if it can't. */
 export function assetNameProblem(name: string, shopAssets: Record<string, string>): string | undefined {
   if (!isAssetName(name)) {
-    return "Names start with a letter and use only lowercase letters, numbers and _ (up to 32).";
+    return `Names start with a letter and use only lowercase letters, numbers and _ (up to ${MAX_ASSET_NAME_LENGTH}).`;
   }
   if (name in shopAssets) return `Your shop already has an image called ${name}. Please pick another name.`;
   return undefined;
@@ -45,7 +45,7 @@ export function suggestAssetName(fileName: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^[^a-z]+|_+$/g, "")
-    .slice(0, 32)
+    .slice(0, MAX_ASSET_NAME_LENGTH)
     .replace(/_+$/, "");
   return base || "image";
 }

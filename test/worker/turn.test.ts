@@ -173,6 +173,15 @@ describe("POST /api/turn, live edit", () => {
     expect(feedback(calls[1]!)).toContain("eco_badge");
   });
 
+  it("rejects an edit that loops without end, sending the error back to Ember", async () => {
+    const LOOP = "{% for i in (1..100000000) %}x{% endfor %}";
+    const calls = fakeEmber(editCall([{ find: SORT_FIND, replace: SORT_FIND + LOOP }], "Hm"), sortEdit());
+
+    expect(await turnJson({ message: "Sort items" })).toMatchObject({ type: "edit", templateSource: sorted });
+    expect(calls).toHaveLength(2);
+    expect(feedback(calls[1]!)).toMatch(/^Edit rejected: .*limit/);
+  });
+
   it("returns too_big on truncated output without retrying", async () => {
     const calls = fakeEmber(truncated());
 
@@ -233,6 +242,12 @@ describe("POST /api/turn, other outcomes", () => {
     });
   });
 
+  it("shows a question with fewer than two options as a plain question", async () => {
+    fakeEmber(toolCall("ask_clarification", { question: "Bigger logo?", options: ["Yes"] }));
+
+    expect(await turnJson({ message: "Logo stuff" })).toEqual({ type: "ask", question: "Bigger logo?", options: [] });
+  });
+
   it("returns a reply tool call", async () => {
     fakeEmber(toolCall("reply", { message: "I only do slips, but I can add a thank-you line! 😊" }));
 
@@ -281,6 +296,41 @@ describe("POST /api/turn, requests", () => {
     expect(content).not.toContain("request 2.");
     expect(content).toContain("request 3.");
     expect(content).toContain("request 12.");
+  });
+
+  it("trims a retry hint over 500 characters instead of refusing the turn", async () => {
+    const calls = fakeEmber(sortEdit());
+    const hint = "a".repeat(500) + "TAIL";
+
+    await turnJson({ message: "Sort items", retryHint: hint });
+
+    const content: string = calls[0]!.body.input[0].content;
+    expect(content).toContain(`Last time: ${"a".repeat(500)}`);
+    expect(content).not.toContain("TAIL");
+  });
+
+  it("trims each history turn to 500 characters from the seller and 1,000 from Flint", async () => {
+    const calls = fakeEmber(sortEdit());
+    const history = [{ user: "u".repeat(500) + "USERTAIL", flint: "f".repeat(1000) + "FLINTTAIL" }];
+
+    await turnJson({ message: "Sort items", history });
+
+    const content: string = calls[0]!.body.input[0].content;
+    expect(content).toContain(`Seller: ${"u".repeat(500)}
+Flint: ${"f".repeat(1000)}`);
+    expect(content).not.toContain("USERTAIL");
+    expect(content).not.toContain("FLINTTAIL");
+  });
+
+  it("refuses a request body over 100 KB without calling Ember", async () => {
+    const calls = fakeEmber();
+    const history = Array.from({ length: 300 }, () => ({ user: "u".repeat(400), flint: "f".repeat(400) }));
+
+    const res = await turn({ message: "Sort items", history });
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ error: "too_large" });
+    expect(calls).toHaveLength(0);
   });
 
   it("answers resting when Ember fails", async () => {

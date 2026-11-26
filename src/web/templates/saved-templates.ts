@@ -5,8 +5,11 @@ import type { Paper, Template } from "../../core";
 
 const PAPERS: readonly Paper[] = ["letter", "a4", "4x6"];
 
+/** Every shop's list is stored under this prefix plus the shop id. */
+export const STORAGE_PREFIX = "flint:templates:";
+
 export function storageKey(shopId: string): string {
-  return `flint:templates:${shopId}`;
+  return `${STORAGE_PREFIX}${shopId}`;
 }
 
 function isTemplate(value: unknown): value is Template {

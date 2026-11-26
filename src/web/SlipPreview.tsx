@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { PAPER_SIZES, PREVIEW_SANDBOX, previewDocument, type Paper } from "../core";
 
 type Props = { html: string; paper: Paper; title?: string };
@@ -12,8 +12,24 @@ function toPx(length: string): number {
 }
 
 /**
+ * The frame is same-origin (so the app can print it), which lets the app cancel link clicks inside
+ * it: a link planted by a hijacked edit (say, carrying order data in its URL) goes nowhere.
+ */
+function blockLinks(event: SyntheticEvent<HTMLIFrameElement>) {
+  const doc = event.currentTarget.contentDocument;
+  doc?.addEventListener(
+    "click",
+    (e) => {
+      if ((e.target as Element | null)?.closest?.("a, area")) e.preventDefault();
+    },
+    true,
+  );
+}
+
+/**
  * Shows rendered slip HTML in a sandboxed iframe (scripts disabled) whose document carries the
- * preview CSP, so template content can't run code or load anything from other sites.
+ * preview CSP, so template content can't run code or load anything from other sites. Link clicks
+ * inside it are cancelled, so it can't navigate away either.
  * The frame is laid out at the paper's real size and scaled down to fit its container.
  */
 export function SlipPreview({ html, paper, title = "Slip preview" }: Props) {
@@ -41,6 +57,7 @@ export function SlipPreview({ html, paper, title = "Slip preview" }: Props) {
         data-paper={paper}
         sandbox={PREVIEW_SANDBOX}
         srcDoc={previewDocument(html, paper)}
+        onLoad={blockLinks}
         style={{ width: size.width, height: size.height, transform: `scale(${scale})` }}
       />
     </div>

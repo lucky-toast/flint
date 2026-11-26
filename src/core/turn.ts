@@ -23,7 +23,8 @@ export type TurnRequest = TurnInput & { shopId: string };
 /** Seller messages are capped so requests stay focused. */
 export const MAX_MESSAGE_LENGTH = 500;
 
-export type TurnErrorCode = "too_big" | "invalid" | "resting";
+/** `too_long`: the Worker refused the request itself as too long (HTTP 400/413); the browser reports it. */
+export type TurnErrorCode = "too_big" | "invalid" | "resting" | "too_long";
 
 /** What POST /api/turn returns. */
 export type TurnResult =
@@ -52,8 +53,10 @@ export type RunTurnOptions = {
 };
 
 export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurnOptions): Promise<TurnResult> {
+  // The system prompt stays fixed per shop so it caches; uploaded names go in the user message.
+  const instructions = buildInstructions(baseShop);
+  // Edits are validated with placeholder images under the uploaded names.
   const shop = withUploadedAssets(baseShop, input.uploadedAssets);
-  const instructions = buildInstructions(shop);
   const items: InputItem[] = [{ role: "user", content: buildUserMessage(input) }];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -127,7 +130,9 @@ async function handleCall(call: FunctionCallItem, shop: Shop, templateSource: st
     }
     case "ask_clarification": {
       if (!isString(args.question)) return { feedback: toolRejection(call.name, "`question` must be a string") };
-      const options = Array.isArray(args.options) ? args.options.filter(isString).slice(0, 4) : [];
+      const offered = Array.isArray(args.options) ? args.options.filter(isString).slice(0, 4) : [];
+      // A choice needs 2-4 options; with fewer, it's shown as a plain question the seller answers in words.
+      const options = offered.length >= 2 ? offered : [];
       return { result: { type: "ask", question: args.question, options } };
     }
     case "request_asset": {

@@ -5,7 +5,7 @@ import { findReplay, REPLAY_CHIPS, shops } from "../../src/data";
 import worker from "../../src/worker";
 import { GLOBAL_BUDGET } from "../../src/worker/budget";
 import { ACCESS_CODE_NOTE, REPLAY_DOESNT_FIT, REPLAY_OTHER_SHOP } from "../../src/worker/replay";
-import { classic, postTurn, turnHeaders, type TurnOptions } from "./client";
+import { classic, postTurn, randomIp, turnHeaders, type TurnOptions } from "./client";
 import { fakeEmber, toolCall } from "./fake-ember";
 
 // Access code and replay mode: without a valid code, /api/turn answers the scripted demo requests
@@ -101,6 +101,18 @@ describe("POST /api/turn, access code", () => {
     expect(await status({})).toMatchObject({ access: true });
     expect(await status({ accessCode: "wrong" })).toMatchObject({ access: false });
     expect(await status({ accessCode: null })).toMatchObject({ access: false });
+  });
+
+  it("stops accepting codes from an IP after 20 code checks in a minute, even the right one", async () => {
+    const status = async (options: TurnOptions) =>
+      (await worker.fetch(new Request("http://flint.test/api/status", { headers: turnHeaders(options) }), env)).json();
+    const ip = randomIp();
+
+    for (let i = 0; i < 20; i++) expect(await status({ ip, accessCode: `guess-${i}` })).toMatchObject({ access: false });
+
+    expect(await status({ ip })).toMatchObject({ access: false });
+    expect(await turn({ message: "Add a QR code" }, { ip })).toEqual({ type: "reply", message: ACCESS_CODE_NOTE });
+    expect(await status({ ip: randomIp() })).toMatchObject({ access: true });
   });
 
   it("gives nobody live access when no access code is configured", async () => {

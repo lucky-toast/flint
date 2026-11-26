@@ -49,6 +49,7 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
                 onUpload={onUpload}
               />
             )}
+            {turn.note && <FlintMessage result={{ type: "error", error: turn.note }} />}
             {turn.undone && <span className="turn-mark">Undone</span>}
             {turn.id === retryTurnId && onTryAgain && !thinking && (
               <button type="button" className="try-again" onClick={onTryAgain}>
