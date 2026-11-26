@@ -161,6 +161,28 @@ body {
   border: 1px solid #f0cdbf;
 }
 
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip {
+  padding: 4px 10px;
+  border: 1px solid #b5532f;
+  border-radius: 999px;
+  background: #fff;
+  color: #b5532f;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: #fbeee8;
+}
+
 .thinking {
   margin: 0;
   font-size: 13px;
