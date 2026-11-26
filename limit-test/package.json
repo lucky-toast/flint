@@ -1,0 +1,16 @@
+{
+  "name": "flint-limit-test",
+  "version": "1.0.0",
+  "description": "Muse Ember limit test for Flint",
+  "scripts": {
+    "dry-run": "node limit-test.mjs --dry-run",
+    "mock": "node limit-test.mjs --mock --runs=1",
+    "test": "node limit-test.mjs",
+    "review": "node review.mjs"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "liquidjs": "^10.30.1"
+  },
+  "private": true
+}

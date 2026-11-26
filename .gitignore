@@ -1,0 +1,17 @@
+# Secrets: never commit these (this repo is public)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# Dependencies and build output
+node_modules/
+dist/
+.wrangler/
+
+# Limit-test output (raw API requests/responses)
+limit-test/results/
+
+# OS / editor
+.DS_Store
