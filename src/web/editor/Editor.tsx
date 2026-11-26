@@ -5,6 +5,7 @@ import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
 import { canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
+import { useHoverSelectPrototype } from "../prototype/hover-select";
 import { ItemChanges } from "./ItemChanges";
 import { OrderPicker } from "./OrderPicker";
 import { ShowCode } from "./ShowCode";
@@ -38,6 +39,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
     if (result.ok) session.send(uploadFollowUp(result.name));
     return result;
   };
+  // PROTOTYPE (#20): hover/select on the working slip, off without ?variant= (on in replay too, so it can be tried without a code).
+  const proto = useHoverSelectPrototype(session.send, true);
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
 
@@ -75,6 +78,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           order={order}
           paper={template.paper}
           assets={uploads.assets}
+          onDocument={proto.onWorkingDocument}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
@@ -83,12 +87,14 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
       <Chat
         turns={session.state.turns}
         thinking={session.thinking}
-        onSend={session.send}
+        onSend={proto.send}
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
         onUpload={upload}
         replayChips={replayChips}
+        composerAddon={proto.composerAddon}
       />
+      {proto.overlay}
     </div>
   );
 }

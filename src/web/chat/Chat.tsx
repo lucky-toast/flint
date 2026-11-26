@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Turn } from "../session/session";
 import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
@@ -15,10 +15,12 @@ type Props = {
   onUpload?: OnUpload;
   /** Replay mode's suggestion chips, shown above the message box. */
   replayChips?: string[];
+  /** PROTOTYPE (#20): shown just above the message box. */
+  composerAddon?: ReactNode;
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, replayChips }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, replayChips, composerAddon }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -66,6 +68,7 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
         <div ref={end} />
       </div>
       {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
+      {composerAddon}
       <Composer disabled={thinking} onSend={onSend} />
     </aside>
   );

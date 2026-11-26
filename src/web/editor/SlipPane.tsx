@@ -15,16 +15,18 @@ type Props = {
   children?: ReactNode;
   /** Content under the slip, e.g. the show-code toggle. */
   footer?: ReactNode;
+  /** PROTOTYPE (#20): passed to the preview frame. */
+  onDocument?: (doc: Document, frame: HTMLIFrameElement) => void;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
       <h2>{label}</h2>
       {children}
-      {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} />}
+      {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} />}
       {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
       {rendered.status === "error" && (
         <p className="slip-status" role="alert">
