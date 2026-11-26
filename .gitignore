@@ -15,3 +15,7 @@ limit-test/results/
 
 # OS / editor
 .DS_Store
+
+# Claude Code: only project skills are committed
+.claude/*
+!.claude/skills/
