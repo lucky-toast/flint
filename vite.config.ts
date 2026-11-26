@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     // During `npm run dev`, forward API calls to a running `wrangler dev`.
-    proxy: { "/api": "http://127.0.0.1:8787" },
+    // "/api/" with the slash, so the app's own src/web/api.ts module isn't proxied.
+    proxy: { "/api/": "http://127.0.0.1:8787" },
   },
 });
