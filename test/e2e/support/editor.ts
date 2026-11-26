@@ -12,6 +12,10 @@ export function editor(page: Page) {
     originalFrame: page.locator('iframe[title="Original slip"]'),
     workingFrame: page.locator('iframe[title="Working slip"]'),
     orderPicker: page.getByLabel("Example order"),
+    /** The what-changed line and item warnings under the working slip. */
+    whatChanged: page.getByRole("region", { name: "Working slip" }).getByTestId("what-changed"),
+    missingItems: page.getByRole("region", { name: "Working slip" }).getByTestId("missing-items"),
+    extraItems: page.getByRole("region", { name: "Working slip" }).getByTestId("extra-items"),
     chat,
     input,
     sendButton: page.getByRole("button", { name: "Send" }),

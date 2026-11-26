@@ -3,6 +3,7 @@ import type { Shop, Template } from "../../core";
 import { Chat } from "../chat/Chat";
 import { workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
+import { ItemChanges } from "./ItemChanges";
 import { OrderPicker } from "./OrderPicker";
 import { ShowCode } from "./ShowCode";
 import { SlipPane } from "./SlipPane";
@@ -32,7 +33,9 @@ export function Editor({ shop, template }: Props) {
           order={order}
           paper={template.paper}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
-        />
+        >
+          <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} />
+        </SlipPane>
       </div>
       <Chat turns={session.state.turns} thinking={session.thinking} onSend={session.send} />
     </div>
