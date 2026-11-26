@@ -29,6 +29,8 @@ export type Session = {
   versions: Version[];
   turns: Turn[];
   nextTurnId: number;
+  /** The Redo stack: versions Undo removed, most recently undone last. Sending any message empties it. */
+  redo: Version[];
 };
 
 export type SessionAction =
@@ -36,6 +38,8 @@ export type SessionAction =
   | { type: "replied"; turnId: number; result: TurnResult }
   /** Steps the working slip back one version and marks that edit's turn undone. */
   | { type: "undid" }
+  /** Puts the most recently undone version back on the working slip and un-marks its turn. */
+  | { type: "redid" }
   /**
    * Try again: sets the turn's edit and reply aside, so the turn waits for Flint's new reply. If
    * that reply is an error, the edit and reply come back and the error shows as a note.
@@ -45,14 +49,15 @@ export type SessionAction =
   | { type: "saved" };
 
 export function createSession(source: string): Session {
-  return { original: source, versions: [{ source, turnId: null }], turns: [], nextTurnId: 1 };
+  return { original: source, versions: [{ source, turnId: null }], turns: [], nextTurnId: 1, redo: [] };
 }
 
 export function sessionReducer(state: Session, action: SessionAction): Session {
   switch (action.type) {
     case "sent": {
       const turn: Turn = { id: state.nextTurnId, message: action.message };
-      return { ...state, turns: [...state.turns, turn], nextTurnId: state.nextTurnId + 1 };
+      // Any message clears Redo: the turns on the stack stay undone for good.
+      return { ...state, turns: [...state.turns, turn], nextTurnId: state.nextTurnId + 1, redo: [] };
     }
     case "replied": {
       const { turnId, result } = action;
@@ -70,9 +75,19 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
     }
     case "undid": {
       if (!canUndo(state)) return state;
-      const { turnId } = state.versions[state.versions.length - 1]!;
-      const turns = state.turns.map((t) => (t.id === turnId ? { ...t, undone: true } : t));
-      return { ...state, turns, versions: state.versions.slice(0, -1) };
+      const removed = state.versions[state.versions.length - 1]!;
+      const turns = state.turns.map((t) => (t.id === removed.turnId ? { ...t, undone: true } : t));
+      return { ...state, turns, versions: state.versions.slice(0, -1), redo: [...state.redo, removed] };
+    }
+    case "redid": {
+      if (!canRedo(state)) return state;
+      const restored = state.redo[state.redo.length - 1]!;
+      const turns = state.turns.map((t) => {
+        if (t.id !== restored.turnId) return t;
+        const { undone: _undone, ...rest } = t;
+        return rest;
+      });
+      return { ...state, turns, versions: [...state.versions, restored], redo: state.redo.slice(0, -1) };
     }
     case "retried": {
       const turn = retryableTurn(state);
@@ -94,6 +109,11 @@ export function hasUnsavedChanges(state: Session): boolean {
 /** Whether Undo has a version to step back to (and Flint isn't mid-reply). */
 export function canUndo(state: Session): boolean {
   return state.versions.length > 1 && !pendingTurn(state);
+}
+
+/** Whether Redo has an undone version to reapply (and Flint isn't mid-reply). */
+export function canRedo(state: Session): boolean {
+  return state.redo.length > 0 && !pendingTurn(state);
 }
 
 /** The turn Try again would redo: the latest turn, when its edit is the working slip. */

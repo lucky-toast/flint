@@ -3,7 +3,7 @@ import type { Shop, Template } from "../../core";
 import { uploadFollowUp } from "../assets/asset-store";
 import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
-import { canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
+import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
 import { OrderPicker } from "./OrderPicker";
@@ -48,6 +48,9 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
           Undo
         </button>
+        <button type="button" onClick={session.redo} disabled={!canRedo(session.state)}>
+          Redo
+        </button>
         <SlipActions
           shop={shop}
           template={template}
@@ -87,6 +90,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
         onUpload={upload}
+        redoPending={session.state.redo.length > 0}
         replayChips={replayChips}
       />
     </div>
