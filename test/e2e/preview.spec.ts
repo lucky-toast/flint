@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const preview = 'iframe[title="Slip preview"]';
+// Both editor panes use the same preview; these checks run on the working slip, which Flint edits.
+const preview = 'iframe[title="Working slip"]';
 
 test("opening the app shows Kiln & Co.'s Classic slip for its default order", async ({ page }) => {
   await page.goto("/");
