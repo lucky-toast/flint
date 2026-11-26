@@ -9,11 +9,11 @@ import {
   type TurnInput,
   type TurnResult,
 } from "../core";
-import { shops } from "../data";
+import { REPLAY_SHOP_ID, shops } from "../data";
 import { hasAccessCode } from "./access";
 import { budgetedEmber, BudgetExhausted, GLOBAL_BUDGET } from "./budget";
 import { withinRateLimits } from "./rate-limits";
-import { ACCESS_CODE_NOTE, replayTurn } from "./replay";
+import { ACCESS_CODE_NOTE, REPLAY_OTHER_SHOP, replayTurn } from "./replay";
 import { parseTurnRequest } from "./turn-request";
 
 export { BudgetDO } from "./budget";
@@ -44,8 +44,10 @@ async function notLive(shop: Shop, input: TurnInput, reason: NotLiveReason): Pro
   if (reason !== "no_access_code") console.log(`turn not live: ${reason}`);
   const replayed = await replayTurn(shop, input);
   if (replayed) return Response.json(replayed);
+  // The note points at the replay chips, which only Kiln & Co. shows; other shops are sent there.
+  const accessNote = shop.id === REPLAY_SHOP_ID ? ACCESS_CODE_NOTE : REPLAY_OTHER_SHOP;
   const fallback: TurnResult =
-    reason === "no_access_code" ? { type: "reply", message: ACCESS_CODE_NOTE } : { type: "error", error: "resting" };
+    reason === "no_access_code" ? { type: "reply", message: accessNote } : { type: "error", error: "resting" };
   return Response.json(fallback);
 }
 

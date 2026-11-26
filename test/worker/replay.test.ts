@@ -81,6 +81,16 @@ describe("POST /api/turn, access code", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("answers free text on another shop without pointing at chips that aren't there", async () => {
+    const calls = fakeEmber();
+
+    expect(await turn({ message: "Add a QR code to the footer", shopId: "second-stitch" })).toEqual({
+      type: "reply",
+      message: REPLAY_OTHER_SHOP,
+    });
+    expect(calls).toHaveLength(0);
+  });
+
   it("matches replay requests loosely, ignoring case, spacing and punctuation", async () => {
     expect(await turn({ message: "  sort the items by QUANTITY (highest first) then by sku! " })).toMatchObject({ type: "edit" });
   });
