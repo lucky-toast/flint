@@ -210,3 +210,25 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* What changed + item warnings under the working slip */
+.item-changes {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.item-changes p {
+  margin: 0 0 4px;
+}
+
+.what-changed {
+  color: var(--muted);
+}
+
+.item-warning {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #fff4dc;
+  border: 1px solid #f0d9a0;
+}
