@@ -4,8 +4,8 @@
 // select named parts (elements with a class) at more than one size, and differ in how you get from
 // a big part to a small one. Switch with ?variant=A|B|C (no param: prototype off).
 //
-//   A  Drill in        Hover and click pick whole sections. Click inside the selected section to
-//                      narrow to the named part under the cursor; "Select bigger" steps back out.
+//   A  Drill in        (Toast's pick) Hover and click pick whole sections. Each click inside the
+//                      selection goes one named level finer; "Select bigger" goes one level back.
 //   B  Smallest first  Hover and click pick the smallest named part under the cursor;
 //                      "Select bigger" widens to the named part around it.
 //   C  Section + parts Click picks a section; its named parts are listed as buttons on the chip.
@@ -140,6 +140,22 @@ function nearestNamed(el: Element, stop: Element | null): Element | null {
   return null;
 }
 
+/** One level finer: the outermost named element between `el` and `sel` (exclusive). */
+function nextLevelDown(el: Element, sel: Element): Element | null {
+  let found: Element | null = null;
+  let node: Element | null = el;
+  while (node && node !== sel) {
+    if (classesOf(node).length) found = node;
+    node = node.parentElement;
+  }
+  return found;
+}
+
+/** The named elements exactly one level below `sel` (no named element in between). */
+function levelBelow(sel: Element): Element[] {
+  return [...sel.querySelectorAll("[class]")].filter((e) => classesOf(e).length && nextLevelDown(e, sel) === e);
+}
+
 /** The named parts inside an element (elements with a class), one per distinct class, in order. */
 function namedParts(el: Element): Element[] {
   const seen = new Set<string>();
@@ -232,7 +248,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
     selectedEl?.setAttribute("data-proto-selected", "");
     let regions: Element[];
     if (variant === "B") regions = root ? [...root.querySelectorAll("[class]")].filter((e) => classesOf(e).length) : [];
-    else if (variant === "A" && selectedEl) regions = [...sections(root), ...namedParts(selectedEl)];
+    else if (variant === "A" && selectedEl) regions = [...sections(root), ...levelBelow(selectedEl)];
     else regions = sections(root);
     for (const r of regions) r.setAttribute("data-proto-region", "");
   }, [doc, variant, selectedEl, root]);
@@ -243,8 +259,9 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
     if (!root) return null;
     if (variant === "B") return nearestNamed(el, root);
     if (variant === "A" && selectedEl && selectedEl.contains(el) && el !== selectedEl) {
-      // Inside the selection: the named part under the cursor, one level finer than the selection.
-      return nearestNamed(el, selectedEl) ?? sectionOf(el, root);
+      // Inside the selection: one level finer than the selection (Toast: one level per click, so a
+      // table can be selected as a table before its cells).
+      return nextLevelDown(el, selectedEl) ?? selectedEl;
     }
     return sectionOf(el, root);
   };
@@ -294,8 +311,8 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
   const sendWithSelection = useCallback(
     (message: string) => {
       const sel = pickedRef.current;
+      // The selection stays until cleared, so follow-ups apply to the same part.
       send(sel ? withContext(message, sel.context) : message);
-      setPicked(null);
     },
     [send],
   );
@@ -303,7 +320,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
   const selectBigger = () => {
     const parent = selectedEl?.parentElement;
     if (!parent || parent === root) return;
-    const named = variant === "B" ? nearestNamed(parent, root) : sectionOf(parent, root);
+    const named = nearestNamed(parent, root) ?? sectionOf(parent, root);
     if (named) setPicked(describe(named));
   };
   const canGoBigger = !!selectedEl && selectedEl.parentElement !== root && !!root;
