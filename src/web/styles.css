@@ -210,3 +210,65 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+.show-code {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.show-code-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.code-view h3 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.code-diff,
+.code-source {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbf9f7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.code-diff > div {
+  white-space: pre;
+}
+
+.diff-sign {
+  display: inline-block;
+  width: 1.5em;
+  color: var(--muted);
+}
+
+.diff-added {
+  background: #e6f4ea;
+}
+
+.diff-removed {
+  background: #fbe9e7;
+}
+
+.diff-skip {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.code-empty {
+  margin: 0;
+  color: var(--muted);
+}
