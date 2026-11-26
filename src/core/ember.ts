@@ -83,7 +83,7 @@ export function createEmberClient({ apiKey, baseUrl = DEFAULT_EMBER_BASE_URL, fe
         throw new EmberError(`Ember request failed: ${err instanceof Error ? err.message : String(err)}`);
       }
       if (!res.ok) throw new EmberError(`Ember answered HTTP ${res.status}`, res.status);
-      const body = (await res.json()) as {
+      let body: {
         status?: string;
         output?: OutputItem[];
         usage?: {
@@ -92,6 +92,12 @@ export function createEmberClient({ apiKey, baseUrl = DEFAULT_EMBER_BASE_URL, fe
           output_tokens?: number;
         };
       };
+      try {
+        body = await res.json();
+      } catch (err) {
+        throw new EmberError(`Ember answered a body that isn't JSON: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      if (!body || typeof body !== "object") throw new EmberError("Ember answered a body that isn't a JSON object");
       return {
         status: body.status ?? "completed",
         output: Array.isArray(body.output) ? body.output : [],
