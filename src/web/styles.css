@@ -1,0 +1,40 @@
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1f1b18;
+  background: #efebe7;
+}
+
+body {
+  margin: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid #ddd5ce;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.app-header p {
+  margin: 0;
+  color: #6b5f57;
+}
+
+.app-main {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.slip-preview {
+  border: none;
+  background: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.12);
+}

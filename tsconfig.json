@@ -1,0 +1,5 @@
+{
+  // Editor entry point. Each runtime has its own config; `npm run typecheck` checks all three.
+  "files": [],
+  "references": [{ "path": "./tsconfig.web.json" }, { "path": "./tsconfig.worker.json" }, { "path": "./tsconfig.node.json" }]
+}

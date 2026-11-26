@@ -1,0 +1,10 @@
+{
+  // Browser: the React app plus the Core and Data it imports.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": ["src/web", "src/core", "src/data"]
+}
