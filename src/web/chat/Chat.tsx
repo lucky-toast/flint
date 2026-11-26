@@ -21,12 +21,15 @@ export function Chat({ turns, thinking, onSend }: Props) {
             <p>Hi! I'm Flint 👋 Tell me what you'd like to change on this slip.</p>
           </div>
         )}
-        {turns.map((turn) => (
+        {turns.map((turn, i) => (
           <div key={turn.id} className={turn.undone ? "turn turn-undone" : "turn"} data-turn-id={turn.id}>
             <div className="message message-seller" data-author="seller">
               <p>{turn.message}</p>
             </div>
-            {turn.result && <FlintMessage result={turn.result} />}
+            {turn.result && (
+              // Chips stay live only on the latest turn: once the seller answers, they're spent.
+              <FlintMessage result={turn.result} onChoose={i === turns.length - 1 && !thinking ? onSend : undefined} />
+            )}
           </div>
         ))}
         {thinking && (
