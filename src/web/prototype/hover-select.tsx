@@ -300,9 +300,8 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
         const next = describe(el);
         setPicked((cur) => (cur && cur.path.join() === next.path.join() ? null : next));
       });
-      // A fresh document (after an edit or order switch): drop a selection that's no longer there.
-      const cur = pickedRef.current;
-      if (cur && !atPath(d, cur.path)) setPicked(null);
+      // A fresh document (after an edit or an order switch): Toast wants the selection cleared.
+      setPicked(null);
       setDoc(d);
     },
     [variant, describe],
@@ -311,7 +310,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
   const sendWithSelection = useCallback(
     (message: string) => {
       const sel = pickedRef.current;
-      // The selection stays until cleared, so follow-ups apply to the same part.
+      // The selection stays after sending; it clears when the slip re-renders (an edit or order switch).
       send(sel ? withContext(message, sel.context) : message);
     },
     [send],
