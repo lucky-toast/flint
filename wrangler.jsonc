@@ -3,6 +3,11 @@
   "name": "flint",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-11-20",
+  // Public URL. A Custom Domain makes Cloudflare create the DNS record and certificate on deploy;
+  // the zone must be on this Cloudflare account. The workers.dev URL is off so there's one public address.
+  "routes": [{ "pattern": "flint.example.com", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
   // The Worker serves the built Vite app from dist/client and handles /api/* itself.
   "assets": {
     "directory": "./dist/client",
