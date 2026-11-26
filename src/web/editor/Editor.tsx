@@ -39,8 +39,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
     if (result.ok) session.send(uploadFollowUp(result.name));
     return result;
   };
-  // PROTOTYPE (#20): hover/select on the working slip, off without ?variant= (on in replay too, so it can be tried without a code).
-  const proto = useHoverSelectPrototype(session.send, true);
+  // PROTOTYPE (#20): hover/select on the working slip, off without ?variant=.
+  const proto = useHoverSelectPrototype(session.send, workingSource(session.state));
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
 

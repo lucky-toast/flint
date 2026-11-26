@@ -1,27 +1,29 @@
 // PROTOTYPE (issue #20), throwaway: never merge into main.
-// Question: what should "point at part of the slip instead of describing it" look like?
-// Three variants on the real editor, switchable with ?variant=A|B|C (no param: prototype off).
-//   A  Outline + chip:  hover outlines the nearest element with a class; click pins it as a chip
-//                       above the message box, and the next message is about it.
-//   B  Named parts:     hover highlights a whole top-level part of the slip (header, ship-to,
-//                       items table, totals…) with a name tag; click pins it like A.
-//   C  Point and ask:   click any element and a small box opens right on the slip, with quick
-//                       actions and a text field; sending goes straight to Flint.
-// In every variant the selection reaches Flint as a line appended to the message (see contextLine).
+// Question: how should "point at part of the slip instead of describing it" behave, both in what
+// the seller can select and in what Flint is told about the selection?
+// Three variants on the real editor's working slip, switchable with ?variant=A|B|C (no param: off).
+//
+//   A  Precise pick    Select: exactly the element under the cursor (a cell, a word's <span>, the
+//                      logo); "Select bigger" on the chip widens it to its parent.
+//                      Flint gets: the rendered HTML of the selection (what's on the slip).
+//   B  Named parts     Select: only whole top-level parts (header, ship-to, items table, totals,
+//                      thank-you), with a name tag on hover.
+//                      Flint gets: where the part is in the template source (line range + first line).
+//   C  Point and ask   Select: the nearest element with a class; clicking opens a box right on the
+//                      slip with quick actions and a text field that send straight away.
+//                      Flint gets: a plain-English name and the class ("the Order number part,
+//                      class order-number").
+//
+// In every variant the selection is appended to the seller's message as one line, and the UI shows
+// exactly that line ("Flint also gets…") so the variants can be compared on what Flint sees.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MAX_MESSAGE_LENGTH } from "../../core";
 
-/** Message plus selection line, kept under the message cap (the message gives way). */
-function withContext(message: string, context: string): string {
-  return `${message.slice(0, MAX_MESSAGE_LENGTH - context.length - 1)}
-${context}`;
-}
-
 export type Variant = "A" | "B" | "C";
 const VARIANTS: Variant[] = ["A", "B", "C"];
-const NAMES: Record<Variant, string> = { A: "Outline + chip", B: "Named parts", C: "Point and ask" };
+const NAMES: Record<Variant, string> = { A: "Precise pick", B: "Named parts", C: "Point and ask" };
 
 type Picked = { label: string; path: number[]; context: string };
 
@@ -29,14 +31,20 @@ const ACCENT = "#e8590c";
 const FRAME_STYLE = `
 [data-proto-hover] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
 [data-proto-selected] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.07) !important; }
-.proto-tag { position: absolute; z-index: 9999; background: ${ACCENT}; color: #fff; font: 600 11px/1 system-ui, sans-serif;
-  padding: 4px 7px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
+.proto-tag { position: absolute; z-index: 9999; background: ${ACCENT}; color: #fff; font: 600 13px/1 system-ui, sans-serif;
+  padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 `;
 
 const TAG_NAMES: Record<string, string> = {
   img: "Image", table: "Table", tr: "Table row", td: "Table cell", th: "Column heading", h1: "Heading",
   h2: "Heading", h3: "Heading", p: "Text", header: "Header", footer: "Footer", section: "Section",
+  div: "Block", span: "Text", strong: "Bold text", em: "Italic text", br: "Line break",
 };
+
+/** Message plus selection line, kept under the message cap (the message gives way). */
+function withContext(message: string, context: string): string {
+  return `${message.slice(0, MAX_MESSAGE_LENGTH - context.length - 1)}\n${context}`;
+}
 
 function readVariant(): Variant | null {
   const v = new URLSearchParams(location.search).get("variant");
@@ -48,8 +56,12 @@ function humanize(cls: string): string {
   return words ? words[0]!.toUpperCase() + words.slice(1) : cls;
 }
 
+function classesOf(el: Element): string[] {
+  return [...el.classList].filter((c) => !c.startsWith("proto"));
+}
+
 function labelFor(el: Element): string {
-  const cls = [...el.classList].find((c) => !c.startsWith("proto"));
+  const cls = classesOf(el)[0];
   if (cls) {
     const name = humanize(cls);
     return el.tagName === "TD" || el.tagName === "TH" ? `${name} column` : name;
@@ -74,52 +86,99 @@ function atPath(doc: Document, path: number[]): Element | null {
   return node;
 }
 
-/** What Flint is told about the selection: the element's opening tag and a little of its text. */
-function contextLine(el: Element): string {
-  const cls = el.getAttribute("class")?.replace(/\s*proto-\S+/g, "");
-  const tag = `<${el.tagName.toLowerCase()}${cls ? ` class="${cls}"` : ""}>`;
-  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
-  return `(The seller pointed at this part of the slip: ${tag}${text ? ` containing "${text}"` : ""})`;
-}
-
 /** The slip's root: the first element in <body> that isn't a <style>. */
 function slipRoot(doc: Document): Element | null {
-  return [...doc.body.children].find((c) => c.tagName !== "STYLE") ?? null;
+  return [...doc.body.children].find((c) => c.tagName !== "STYLE" && !c.classList.contains("proto-tag")) ?? null;
 }
 
-/** Variant A/C target: the nearest element with a class, below the slip root. */
-function nearestClassed(el: Element, root: Element | null): Element | null {
-  let node: Element | null = el;
-  while (node && node !== root && node.tagName !== "BODY") {
-    if (node.classList.length) return node;
-    node = node.parentElement;
-  }
-  return null;
+// ---- What can be selected ----
+
+/** A: the element itself, unless it's the slip root or body. */
+function exactElement(el: Element, root: Element | null): Element | null {
+  return el === root || el.tagName === "BODY" || el.tagName === "HTML" ? null : el;
 }
 
-/** Variant B target: the top-level part of the slip that holds the element. */
+/** B: the top-level part of the slip that holds the element. */
 function topLevelPart(el: Element, root: Element | null): Element | null {
   let node: Element | null = el;
   while (node && node.parentElement && node.parentElement !== root) {
     if (node.tagName === "BODY") return null;
     node = node.parentElement;
   }
-  return node && node !== root ? node : null;
+  return node && node !== root && node.tagName !== "BODY" ? node : null;
+}
+
+/** C: the nearest element with a class, below the slip root. */
+function nearestClassed(el: Element, root: Element | null): Element | null {
+  let node: Element | null = el;
+  while (node && node !== root && node.tagName !== "BODY") {
+    if (classesOf(node).length) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+// ---- What Flint is told ----
+
+function openingTag(el: Element): string {
+  const cls = classesOf(el).join(" ");
+  return `<${el.tagName.toLowerCase()}${cls ? ` class="${cls}"` : ""}>`;
+}
+
+/** A: the rendered HTML, whitespace collapsed, cut to fit. */
+function renderedHtmlContext(el: Element): string {
+  const clone = el.cloneNode(true) as Element;
+  for (const e of [clone, ...clone.querySelectorAll("*")]) {
+    e.removeAttribute("data-proto-hover");
+    e.removeAttribute("data-proto-selected");
+    // Data-URL images would eat the whole budget.
+    const src = e.getAttribute("src");
+    if (src?.startsWith("data:")) e.setAttribute("src", "data:…");
+  }
+  let html = clone.outerHTML.replace(/\s+/g, " ").trim();
+  if (html.length > 220) html = `${html.slice(0, 220)}…`;
+  return `(The seller selected this rendered HTML on the slip: ${html})`;
+}
+
+/** B: where the part sits in the template source, found by its first class. */
+function sourceLocationContext(el: Element, source: string): string {
+  const cls = classesOf(el)[0];
+  const lines = source.split("\n");
+  const start = cls ? lines.findIndex((l) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(l) && !/^\s*\./.test(l)) : -1;
+  if (start < 0) return `(The seller selected the part of the slip that starts with ${openingTag(el)})`;
+  const indent = /^\s*/.exec(lines[start]!)![0];
+  let end = start;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i]!.startsWith(`${indent}</`)) {
+      end = i;
+      break;
+    }
+  }
+  const first = lines[start]!.trim().slice(0, 120);
+  return `(The seller selected template lines ${start + 1}-${end + 1}, starting: ${first})`;
+}
+
+/** C: a plain-English name plus the class. */
+function nameContext(el: Element): string {
+  const cls = classesOf(el)[0];
+  return `(This is about the "${labelFor(el)}" part of the slip${cls ? `, class ${cls}` : ""}.)`;
 }
 
 function clearMark(doc: Document, attr: string) {
   doc.querySelectorAll(`[${attr}]`).forEach((e) => e.removeAttribute(attr));
 }
 
-type Popover = { x: number; y: number; label: string; context: string };
+type Popover = { x: number; y: number; picked: Picked };
 
-export function useHoverSelectPrototype(send: (message: string) => void, enabled: boolean) {
-  const [variant, setVariant] = useState<Variant | null>(() => (enabled ? readVariant() : null));
+export function useHoverSelectPrototype(send: (message: string) => void, source: string) {
+  const [variant, setVariant] = useState<Variant | null>(readVariant);
   const [picked, setPicked] = useState<Picked | null>(null);
   const [popover, setPopover] = useState<Popover | null>(null);
   const docRef = useRef<Document | null>(null);
   const pickedRef = useRef(picked);
   pickedRef.current = picked;
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
 
   const choose = useCallback((v: Variant) => {
     const url = new URL(location.href);
@@ -139,7 +198,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
     if (!variant) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest("input, textarea, [contenteditable]")) return;
+      if (t.closest("input, textarea, select, [contenteditable]")) return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       const i = VARIANTS.indexOf(variant);
       choose(VARIANTS[(i + (e.key === "ArrowRight" ? 1 : VARIANTS.length - 1)) % VARIANTS.length]!);
@@ -148,13 +207,22 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
     return () => window.removeEventListener("keydown", onKey);
   }, [variant, choose]);
 
-  // Re-mark the selection on a fresh slip document (each edit or order switch re-renders it).
+  // Re-mark the selection whenever it changes.
   useEffect(() => {
     const doc = docRef.current;
     if (!doc) return;
     clearMark(doc, "data-proto-selected");
     if (picked) atPath(doc, picked.path)?.setAttribute("data-proto-selected", "");
   }, [picked]);
+
+  const describe = useCallback(
+    (el: Element): Picked => {
+      const context =
+        variant === "A" ? renderedHtmlContext(el) : variant === "B" ? sourceLocationContext(el, sourceRef.current) : nameContext(el);
+      return { label: labelFor(el), path: pathOf(el), context };
+    },
+    [variant],
+  );
 
   const onWorkingDocument = useCallback(
     (doc: Document, frame: HTMLIFrameElement) => {
@@ -168,9 +236,15 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
       tag.hidden = true;
       doc.body.appendChild(tag);
       const root = slipRoot(doc);
-      const target = (el: Element) => (variant === "B" ? topLevelPart(el, root) : nearestClassed(el, root));
+      const target = (el: Element) =>
+        variant === "A" ? exactElement(el, root) : variant === "B" ? topLevelPart(el, root) : nearestClassed(el, root);
 
-      if (pickedRef.current) atPath(doc, pickedRef.current.path)?.setAttribute("data-proto-selected", "");
+      // A fresh document (after an edit or order switch): find the selection again, or drop it.
+      if (pickedRef.current) {
+        const again = atPath(doc, pickedRef.current.path);
+        if (again) again.setAttribute("data-proto-selected", "");
+        else setPicked(null);
+      }
 
       doc.addEventListener("mouseover", (e) => {
         clearMark(doc, "data-proto-hover");
@@ -178,13 +252,11 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
         tag.hidden = true;
         if (!el) return;
         el.setAttribute("data-proto-hover", "");
-        if (variant === "B" || variant === "A") {
-          const r = el.getBoundingClientRect();
-          tag.textContent = labelFor(el);
-          tag.style.left = `${r.left + doc.defaultView!.scrollX - 2}px`;
-          tag.style.top = `${r.top + doc.defaultView!.scrollY - 22}px`;
-          tag.hidden = false;
-        }
+        const r = el.getBoundingClientRect();
+        tag.textContent = labelFor(el);
+        tag.style.left = `${r.left + doc.defaultView!.scrollX - 2}px`;
+        tag.style.top = `${r.top + doc.defaultView!.scrollY - 24}px`;
+        tag.hidden = false;
       });
       doc.addEventListener("mouseleave", () => {
         clearMark(doc, "data-proto-hover");
@@ -197,22 +269,19 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
           setPopover(null);
           return;
         }
-        const next: Picked = { label: labelFor(el), path: pathOf(el), context: contextLine(el) };
-        setPicked((cur) => (variant !== "C" && cur && cur.path.join() === next.path.join() ? null : next));
+        const next = describe(el);
         if (variant === "C") {
+          setPicked(next);
           const frameRect = frame.getBoundingClientRect();
           const scale = frameRect.width / frame.offsetWidth;
           const r = el.getBoundingClientRect();
-          setPopover({
-            x: frameRect.left + r.left * scale,
-            y: frameRect.top + r.bottom * scale + 6,
-            label: next.label,
-            context: next.context,
-          });
+          setPopover({ x: frameRect.left + r.left * scale, y: frameRect.top + r.bottom * scale + 6, picked: next });
+        } else {
+          setPicked((cur) => (cur && cur.path.join() === next.path.join() ? null : next));
         }
       });
     },
-    [variant],
+    [variant, describe],
   );
 
   // Variant C's popover is anchored to the page; scrolling moves the slip, so close it.
@@ -229,26 +298,50 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
   const sendWithSelection = useCallback(
     (message: string) => {
       const sel = pickedRef.current;
-      send(sel && variant !== "C" ? `${message}\n${sel.context}` : message);
+      send(sel && variant !== "C" ? withContext(message, sel.context) : message);
       setPicked(null);
     },
     [send, variant],
   );
 
-  if (!variant) return { active: false as const, onWorkingDocument: undefined, send, composerAddon: null, overlay: null };
+  /** A: widen the selection to its parent. */
+  const selectBigger = useCallback(() => {
+    const doc = docRef.current;
+    const cur = pickedRef.current;
+    if (!doc || !cur) return;
+    const el = atPath(doc, cur.path)?.parentElement;
+    const root = slipRoot(doc);
+    if (el && el !== root && el.tagName !== "BODY") setPicked(describe(el));
+  }, [describe]);
+
+  if (!variant) return { onWorkingDocument: undefined, send, composerAddon: null, overlay: null };
 
   const composerAddon: ReactNode =
     variant !== "C" ? (
       <div className="proto-chip-row">
         {picked ? (
-          <span className="proto-chip">
-            📍 About: <strong>{picked.label}</strong>
-            <button type="button" aria-label="Clear selection" onClick={() => setPicked(null)}>
-              ×
-            </button>
-          </span>
+          <>
+            <span className="proto-chip">
+              📍 About: <strong>{picked.label}</strong>
+              {variant === "A" && (
+                <button type="button" className="proto-bigger" onClick={selectBigger}>
+                  Select bigger
+                </button>
+              )}
+              <button type="button" aria-label="Clear selection" onClick={() => setPicked(null)}>
+                ×
+              </button>
+            </span>
+            <div className="proto-context">
+              Flint also gets: <code>{picked.context}</code>
+            </div>
+          </>
         ) : (
-          <span className="proto-hint">Tip: click part of the working slip to talk about just that part.</span>
+          <span className="proto-hint">
+            {variant === "A"
+              ? "Tip: click anything on the working slip to talk about exactly that."
+              : "Tip: click a section of the working slip to talk about just that section."}
+          </span>
         )}
       </div>
     ) : null;
@@ -259,7 +352,7 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
         <PointAndAsk
           popover={popover}
           onSend={(text) => {
-            send(`${text}\n${popover.context}`);
+            send(withContext(text, popover.picked.context));
             setPopover(null);
             setPicked(null);
           }}
@@ -284,17 +377,18 @@ export function useHoverSelectPrototype(send: (message: string) => void, enabled
     document.body,
   );
 
-  return { active: true as const, onWorkingDocument, send: sendWithSelection, composerAddon, overlay };
+  return { onWorkingDocument, send: sendWithSelection, composerAddon, overlay };
 }
 
 const QUICK = ["Make it bigger", "Make it bold", "Hide it", "Move it to the bottom"];
 
 function PointAndAsk({ popover, onSend, onClose }: { popover: Popover; onSend: (t: string) => void; onClose: () => void }) {
   const [text, setText] = useState("");
+  const { label, context } = popover.picked;
   return (
     <div className="proto-popover" style={{ left: popover.x, top: popover.y }}>
       <div className="proto-popover-head">
-        <strong>{popover.label}</strong>
+        <strong>{label}</strong>
         <button type="button" aria-label="Close" onClick={onClose}>
           ×
         </button>
@@ -312,8 +406,11 @@ function PointAndAsk({ popover, onSend, onClose }: { popover: Popover; onSend: (
           if (text.trim()) onSend(text.trim());
         }}
       >
-        <input autoFocus value={text} placeholder={`Change the ${popover.label.toLowerCase()}…`} onChange={(e) => setText(e.target.value)} />
+        <input autoFocus value={text} placeholder={`Change the ${label.toLowerCase()}…`} onChange={(e) => setText(e.target.value)} />
       </form>
+      <div className="proto-context">
+        Flint also gets: <code>{context}</code>
+      </div>
     </div>
   );
 }

@@ -658,3 +658,6 @@ body {
 .proto-popover-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .proto-popover-chips button { border: 1px solid #ddd; background: #fafafa; border-radius: 999px; padding: 3px 9px; cursor: pointer; font-size: 12px; }
 .proto-popover input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; }
+.proto-bigger { border: 1px solid #e8590c !important; border-radius: 999px; font-size: 11px !important; padding: 1px 7px; }
+.proto-context { margin-top: 6px; font-size: 11px; color: #666; line-height: 1.4; }
+.proto-context code { font-size: 10.5px; word-break: break-word; color: #333; background: #f4f1ee; padding: 1px 3px; border-radius: 3px; }
