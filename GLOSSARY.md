@@ -23,3 +23,16 @@ A turn whose edit was undone. It stays in the chat with an "Undone" mark and Fli
 **Redo stack**:
 The undone versions waiting to be reapplied, most recently undone on top. Sending any message empties it, and its undone turns then stay undone for good.
 _Avoid_: redo history
+
+## Pointing at the slip
+
+**Part**:
+An element of the working slip that has a class, at any depth: the logo, the order number, the items table, an SKU column. Only parts can be selected; anything finer, the seller describes in words.
+_Avoid_: element, region (in anything the seller reads)
+
+**Section**:
+A top-level part of the slip, such as the header, ship-to, items table, totals or thank-you line. The first click on the slip selects a section; each further click inside the selection goes one part finer.
+
+**Selection**:
+The part the seller picked on the working slip. Flint is told only enough to find it in the template: the part's name and its template source, quoted verbatim and extended until it occurs once. It never describes the rendered slip, since Flint never sees the example orders. It travels with the turn, stays in the history Flint sees, and clears whenever the slip re-renders or the example order changes.
+_Avoid_: highlight, focus
