@@ -25,7 +25,7 @@ Restart `npm start` after editing `.dev.vars`.
 ## Live and replay
 
 - **Replay** (default, no code): the header shows a Replay badge. On Kiln & Co., chips play recorded responses for the demo requests. Replay spends nothing.
-- **Live**: click "Have an access code?" in the header and enter your `ACCESS_CODE`. The badge switches to Live, and requests go to Muse Ember (capped at $3 in total by `TOKEN_BUDGET_USD` in `wrangler.jsonc`).
+- **Live**: click "Have an access code?" in the header and enter your `ACCESS_CODE`. The badge switches to Live, and requests go to Muse Ember (capped at $3 in total by `TOKEN_BUDGET_USD` in `wrangler.jsonc`). Each browser tab gets 50 live messages in total (`SESSION_MESSAGE_CAP`) and each IP about 10 a minute; past either, requests rest.
 
 ## Turn logs
 

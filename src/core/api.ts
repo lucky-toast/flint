@@ -3,7 +3,7 @@
 /** GET /api/status. `access`: whether the request carried a valid access code (without one, turns are replayed). */
 export type Status = { live: boolean; access: boolean; budgetRemainingPct: number };
 
-/** The browser sends a random per-tab session id in this header; the Worker rate-limits per session on it. */
+/** The browser sends a random per-tab session id in this header; the Worker caps live messages per session on it. */
 export const SESSION_HEADER = "x-flint-session";
 
 /** The judge's access code travels in this header. */
