@@ -1,21 +1,19 @@
 // PROTOTYPE (issue #20), throwaway: never merge into main.
-// Question: how should "point at part of the slip instead of describing it" behave, both in what
-// the seller can select and in what Flint is told about the selection?
-// Three variants on the real editor's working slip, switchable with ?variant=A|B|C (no param: off).
+// Question: how should "point at part of the slip instead of describing it" behave?
+// Round 2: Toast landed between "exact element" and "whole sections only", so all three variants
+// select named parts (elements with a class) at more than one size, and differ in how you get from
+// a big part to a small one. Switch with ?variant=A|B|C (no param: prototype off).
 //
-//   A  Precise pick    Select: exactly the element under the cursor (a cell, a word's <span>, the
-//                      logo); "Select bigger" on the chip widens it to its parent.
-//                      Flint gets: the rendered HTML of the selection (what's on the slip).
-//   B  Named parts     Select: only whole top-level parts (header, ship-to, items table, totals,
-//                      thank-you), with a name tag on hover.
-//                      Flint gets: where the part is in the template source (line range + first line).
-//   C  Point and ask   Select: the nearest element with a class; clicking opens a box right on the
-//                      slip with quick actions and a text field that send straight away.
-//                      Flint gets: a plain-English name and the class ("the Order number part,
-//                      class order-number").
+//   A  Drill in        Hover and click pick whole sections. Click inside the selected section to
+//                      narrow to the named part under the cursor; "Select bigger" steps back out.
+//   B  Smallest first  Hover and click pick the smallest named part under the cursor;
+//                      "Select bigger" widens to the named part around it.
+//   C  Section + parts Click picks a section; its named parts are listed as buttons on the chip.
+//                      Hovering a button highlights that part; clicking it narrows the selection.
 //
-// In every variant the selection is appended to the seller's message as one line, and the UI shows
-// exactly that line ("Flint also gets…") so the variants can be compared on what Flint sees.
+// While the cursor is over the slip, every region you could select right now shows a faint box.
+// In every variant Flint gets the part's name and its first line in the template, quoted verbatim,
+// so it can copy it into an edit (Flint edits by exact find/replace and never sees line numbers).
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -23,7 +21,7 @@ import { MAX_MESSAGE_LENGTH } from "../../core";
 
 export type Variant = "A" | "B" | "C";
 const VARIANTS: Variant[] = ["A", "B", "C"];
-const NAMES: Record<Variant, string> = { A: "Precise pick", B: "Named parts", C: "Point and ask" };
+const NAMES: Record<Variant, string> = { A: "Drill in", B: "Smallest first", C: "Section + parts" };
 
 type Picked = { label: string; path: number[]; context: string };
 
@@ -36,12 +34,6 @@ body.proto-over [data-proto-region] { outline: 1px dashed rgb(232 89 12 / 0.45);
   padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 `;
 
-const TAG_NAMES: Record<string, string> = {
-  img: "Image", table: "Table", tr: "Table row", td: "Table cell", th: "Column heading", h1: "Heading",
-  h2: "Heading", h3: "Heading", p: "Text", header: "Header", footer: "Footer", section: "Section",
-  div: "Block", span: "Text", strong: "Bold text", em: "Italic text", br: "Line break",
-};
-
 /** Message plus selection line, kept under the message cap (the message gives way). */
 function withContext(message: string, context: string): string {
   return `${message.slice(0, MAX_MESSAGE_LENGTH - context.length - 1)}\n${context}`;
@@ -52,22 +44,16 @@ function readVariant(): Variant | null {
   return VARIANTS.includes(v as Variant) ? (v as Variant) : null;
 }
 
-function humanize(cls: string): string {
-  const words = cls.replace(/^(col|slip)-/, "").replace(/[-_]+/g, " ").trim();
-  return words ? words[0]!.toUpperCase() + words.slice(1) : cls;
-}
-
 function classesOf(el: Element): string[] {
   return [...el.classList].filter((c) => !c.startsWith("proto"));
 }
 
 function labelFor(el: Element): string {
   const cls = classesOf(el)[0];
-  if (cls) {
-    const name = humanize(cls);
-    return el.tagName === "TD" || el.tagName === "TH" ? `${name} column` : name;
-  }
-  return TAG_NAMES[el.tagName.toLowerCase()] ?? el.tagName.toLowerCase();
+  if (!cls) return el.tagName.toLowerCase();
+  const words = cls.replace(/^(col|slip)-/, "").replace(/[-_]+/g, " ").trim();
+  const name = words ? words[0]!.toUpperCase() + words.slice(1) : cls;
+  return el.tagName === "TD" || el.tagName === "TH" ? `${name} column` : name;
 }
 
 /** Child-index path from <body>, so the same element can be found again after a re-render. */
@@ -87,20 +73,17 @@ function atPath(doc: Document, path: number[]): Element | null {
   return node;
 }
 
-/** The slip's root: the first element in <body> that isn't a <style>. */
+/** The slip's root: the first element in <body> that isn't a <style> or our tag. */
 function slipRoot(doc: Document): Element | null {
   return [...doc.body.children].find((c) => c.tagName !== "STYLE" && !c.classList.contains("proto-tag")) ?? null;
 }
 
-// ---- What can be selected ----
-
-/** A: the element itself, unless it's the slip root or body. */
-function exactElement(el: Element, root: Element | null): Element | null {
-  return el === root || el.tagName === "BODY" || el.tagName === "HTML" ? null : el;
+/** Whole sections: the slip root's children. */
+function sections(root: Element | null): Element[] {
+  return [...(root?.children ?? [])].filter((c) => c.tagName !== "STYLE");
 }
 
-/** B: the top-level part of the slip that holds the element. */
-function topLevelPart(el: Element, root: Element | null): Element | null {
+function sectionOf(el: Element, root: Element | null): Element | null {
   let node: Element | null = el;
   while (node && node.parentElement && node.parentElement !== root) {
     if (node.tagName === "BODY") return null;
@@ -109,90 +92,69 @@ function topLevelPart(el: Element, root: Element | null): Element | null {
   return node && node !== root && node.tagName !== "BODY" ? node : null;
 }
 
-/** C: the nearest element with a class, below the slip root. */
-function nearestClassed(el: Element, root: Element | null): Element | null {
+/** The nearest element with a class, from el up to (and including) `stop`'s child. */
+function nearestNamed(el: Element, stop: Element | null): Element | null {
   let node: Element | null = el;
-  while (node && node !== root && node.tagName !== "BODY") {
+  while (node && node !== stop && node.tagName !== "BODY") {
     if (classesOf(node).length) return node;
     node = node.parentElement;
   }
   return null;
 }
 
-// ---- What Flint is told ----
-
-function openingTag(el: Element): string {
-  const cls = classesOf(el).join(" ");
-  return `<${el.tagName.toLowerCase()}${cls ? ` class="${cls}"` : ""}>`;
+/** The named parts inside an element (elements with a class), one per distinct class, in order. */
+function namedParts(el: Element): Element[] {
+  const seen = new Set<string>();
+  return [...el.querySelectorAll("[class]")].filter((e) => {
+    const cls = classesOf(e)[0];
+    if (!cls || seen.has(cls)) return false;
+    seen.add(cls);
+    return true;
+  });
 }
 
-/** A: the rendered HTML, whitespace collapsed, cut to fit. */
-function renderedHtmlContext(el: Element): string {
-  const clone = el.cloneNode(true) as Element;
-  for (const e of [clone, ...clone.querySelectorAll("*")]) {
-    e.removeAttribute("data-proto-hover");
-    e.removeAttribute("data-proto-selected");
-    // Data-URL images would eat the whole budget.
-    const src = e.getAttribute("src");
-    if (src?.startsWith("data:")) e.setAttribute("src", "data:…");
-  }
-  let html = clone.outerHTML.replace(/\s+/g, " ").trim();
-  if (html.length > 220) html = `${html.slice(0, 220)}…`;
-  return `(The seller selected this rendered HTML on the slip: ${html})`;
-}
-
-/** B: where the part sits in the template source, found by its first class. */
-function sourceLocationContext(el: Element, source: string): string {
+/** Flint gets the part's name and its first template line, verbatim, found by tag and first class. */
+function sourceContext(el: Element, source: string): string {
+  const tag = el.tagName.toLowerCase();
   const cls = classesOf(el)[0];
-  const lines = source.split("\n");
-  const start = cls ? lines.findIndex((l) => new RegExp(`class="[^"]*\\b${cls}\\b`).test(l) && !/^\s*\./.test(l)) : -1;
-  if (start < 0) return `(The seller selected the part of the slip that starts with ${openingTag(el)})`;
-  const indent = /^\s*/.exec(lines[start]!)![0];
-  let end = start;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (lines[i]!.startsWith(`${indent}</`)) {
-      end = i;
-      break;
-    }
-  }
-  const first = lines[start]!.trim().slice(0, 120);
-  return `(The seller selected template lines ${start + 1}-${end + 1}, starting: ${first})`;
-}
-
-/** C: a plain-English name plus the class. */
-function nameContext(el: Element): string {
-  const cls = classesOf(el)[0];
-  return `(This is about the "${labelFor(el)}" part of the slip${cls ? `, class ${cls}` : ""}.)`;
+  const line = cls
+    ? source.split("\n").find((l) => new RegExp(`<${tag}\\b[^>]*class="[^"]*\\b${cls}\\b`).test(l))
+    : undefined;
+  const quoted = (line?.trim() ?? `<${tag}${cls ? ` class="${cls}"` : ""}>`).slice(0, 180);
+  return `(The seller selected the "${labelFor(el)}" part of the slip. It starts at this template line: ${quoted})`;
 }
 
 function clearMark(doc: Document, attr: string) {
   doc.querySelectorAll(`[${attr}]`).forEach((e) => e.removeAttribute(attr));
 }
 
-type Popover = { x: number; y: number; picked: Picked };
-
 export function useHoverSelectPrototype(send: (message: string) => void, source: string) {
   const [variant, setVariant] = useState<Variant | null>(readVariant);
   const [picked, setPicked] = useState<Picked | null>(null);
-  const [popover, setPopover] = useState<Popover | null>(null);
-  const docRef = useRef<Document | null>(null);
+  const [doc, setDoc] = useState<Document | null>(null);
   const pickedRef = useRef(picked);
   pickedRef.current = picked;
   const sourceRef = useRef(source);
   sourceRef.current = source;
 
-  const choose = useCallback((v: Variant) => {
-    const url = new URL(location.href);
-    url.searchParams.set("variant", v);
-    history.replaceState(null, "", url);
-    setVariant(v);
-    setPicked(null);
-    setPopover(null);
-    if (docRef.current) {
-      clearMark(docRef.current, "data-proto-selected");
-      clearMark(docRef.current, "data-proto-hover");
-    }
+  const describe = useCallback((el: Element): Picked => {
+    return { label: labelFor(el), path: pathOf(el), context: sourceContext(el, sourceRef.current) };
   }, []);
+
+  const choose = useCallback(
+    (v: Variant) => {
+      const url = new URL(location.href);
+      url.searchParams.set("variant", v);
+      history.replaceState(null, "", url);
+      setVariant(v);
+      setPicked(null);
+      if (doc) {
+        clearMark(doc, "data-proto-selected");
+        clearMark(doc, "data-proto-hover");
+      }
+    },
+    [doc],
+  );
 
   // ← and → cycle variants, except while typing.
   useEffect(() => {
@@ -208,219 +170,159 @@ export function useHoverSelectPrototype(send: (message: string) => void, source:
     return () => window.removeEventListener("keydown", onKey);
   }, [variant, choose]);
 
-  // Re-mark the selection whenever it changes.
-  useEffect(() => {
-    const doc = docRef.current;
-    if (!doc) return;
-    clearMark(doc, "data-proto-selected");
-    if (picked) atPath(doc, picked.path)?.setAttribute("data-proto-selected", "");
-  }, [picked]);
+  const selectedEl = doc && picked ? atPath(doc, picked.path) : null;
+  const root = doc ? slipRoot(doc) : null;
 
-  const describe = useCallback(
-    (el: Element): Picked => {
-      const context =
-        variant === "A" ? renderedHtmlContext(el) : variant === "B" ? sourceLocationContext(el, sourceRef.current) : nameContext(el);
-      return { label: labelFor(el), path: pathOf(el), context };
-    },
-    [variant],
-  );
+  // Mark the selection and the regions selectable right now.
+  useEffect(() => {
+    if (!doc || !variant) return;
+    clearMark(doc, "data-proto-selected");
+    clearMark(doc, "data-proto-region");
+    selectedEl?.setAttribute("data-proto-selected", "");
+    let regions: Element[];
+    if (variant === "B") regions = root ? [...root.querySelectorAll("[class]")].filter((e) => classesOf(e).length) : [];
+    else if (variant === "A" && selectedEl) regions = [...sections(root), ...namedParts(selectedEl)];
+    else regions = sections(root);
+    for (const r of regions) r.setAttribute("data-proto-region", "");
+  }, [doc, variant, selectedEl, root]);
+
+  // Which element the cursor points at, per variant.
+  const targetRef = useRef<(el: Element) => Element | null>(() => null);
+  targetRef.current = (el: Element) => {
+    if (!root) return null;
+    if (variant === "B") return nearestNamed(el, root);
+    if (variant === "A" && selectedEl && selectedEl.contains(el) && el !== selectedEl) {
+      // Inside the selection: the named part under the cursor, one level finer than the selection.
+      return nearestNamed(el, selectedEl) ?? sectionOf(el, root);
+    }
+    return sectionOf(el, root);
+  };
 
   const onWorkingDocument = useCallback(
-    (doc: Document, frame: HTMLIFrameElement) => {
+    (d: Document) => {
       if (!variant) return;
-      docRef.current = doc;
-      const style = doc.createElement("style");
+      const style = d.createElement("style");
       style.textContent = FRAME_STYLE;
-      doc.head.appendChild(style);
-      const tag = doc.createElement("div");
+      d.head.appendChild(style);
+      const tag = d.createElement("div");
       tag.className = "proto-tag";
       tag.hidden = true;
-      doc.body.appendChild(tag);
-      const root = slipRoot(doc);
-      const target = (el: Element) =>
-        variant === "A" ? exactElement(el, root) : variant === "B" ? topLevelPart(el, root) : nearestClassed(el, root);
-
-      // A fresh document (after an edit or order switch): find the selection again, or drop it.
-      // While the cursor is over the slip, every selectable region shows its box.
-      const candidates =
-        variant === "B"
-          ? [...(root?.children ?? [])].filter((c) => c.tagName !== "STYLE")
-          : [...(root?.querySelectorAll("[class]") ?? [])].filter((c) => classesOf(c).length);
-      for (const c of candidates) c.setAttribute("data-proto-region", "");
-      doc.documentElement.addEventListener("mouseenter", () => doc.body.classList.add("proto-over"));
-      doc.documentElement.addEventListener("mouseleave", () => {
-        doc.body.classList.remove("proto-over");
-        clearMark(doc, "data-proto-hover");
+      d.body.appendChild(tag);
+      d.documentElement.addEventListener("mouseenter", () => d.body.classList.add("proto-over"));
+      d.documentElement.addEventListener("mouseleave", () => {
+        d.body.classList.remove("proto-over");
+        clearMark(d, "data-proto-hover");
         tag.hidden = true;
       });
-
-      if (pickedRef.current) {
-        const again = atPath(doc, pickedRef.current.path);
-        if (again) again.setAttribute("data-proto-selected", "");
-        else setPicked(null);
-      }
-
-      doc.addEventListener("mouseover", (e) => {
-        clearMark(doc, "data-proto-hover");
-        const el = target(e.target as Element);
+      d.addEventListener("mouseover", (e) => {
+        clearMark(d, "data-proto-hover");
         tag.hidden = true;
+        const el = targetRef.current(e.target as Element);
         if (!el) return;
         el.setAttribute("data-proto-hover", "");
         const r = el.getBoundingClientRect();
         tag.textContent = labelFor(el);
-        tag.style.left = `${r.left + doc.defaultView!.scrollX - 2}px`;
-        tag.style.top = `${r.top + doc.defaultView!.scrollY - 24}px`;
+        tag.style.left = `${r.left + d.defaultView!.scrollX - 2}px`;
+        tag.style.top = `${r.top + d.defaultView!.scrollY - 24}px`;
         tag.hidden = false;
       });
-      doc.addEventListener("click", (e) => {
-        const el = target(e.target as Element);
-        if (!el) {
-          setPicked(null);
-          setPopover(null);
-          return;
-        }
+      d.addEventListener("click", (e) => {
+        const el = targetRef.current(e.target as Element);
+        if (!el) return setPicked(null);
         const next = describe(el);
-        if (variant === "C") {
-          setPicked(next);
-          const frameRect = frame.getBoundingClientRect();
-          const scale = frameRect.width / frame.offsetWidth;
-          const r = el.getBoundingClientRect();
-          setPopover({ x: frameRect.left + r.left * scale, y: frameRect.top + r.bottom * scale + 6, picked: next });
-        } else {
-          setPicked((cur) => (cur && cur.path.join() === next.path.join() ? null : next));
-        }
+        setPicked((cur) => (cur && cur.path.join() === next.path.join() ? null : next));
       });
+      // A fresh document (after an edit or order switch): drop a selection that's no longer there.
+      const cur = pickedRef.current;
+      if (cur && !atPath(d, cur.path)) setPicked(null);
+      setDoc(d);
     },
     [variant, describe],
   );
 
-  // Variant C's popover is anchored to the page; scrolling moves the slip, so close it.
-  useEffect(() => {
-    if (!popover) return;
-    const close = () => {
-      setPopover(null);
-      setPicked(null);
-    };
-    window.addEventListener("scroll", close, true);
-    return () => window.removeEventListener("scroll", close, true);
-  }, [popover]);
-
   const sendWithSelection = useCallback(
     (message: string) => {
       const sel = pickedRef.current;
-      send(sel && variant !== "C" ? withContext(message, sel.context) : message);
+      send(sel ? withContext(message, sel.context) : message);
       setPicked(null);
     },
-    [send, variant],
+    [send],
   );
 
-  /** A: widen the selection to its parent. */
-  const selectBigger = useCallback(() => {
-    const doc = docRef.current;
-    const cur = pickedRef.current;
-    if (!doc || !cur) return;
-    const el = atPath(doc, cur.path)?.parentElement;
-    const root = slipRoot(doc);
-    if (el && el !== root && el.tagName !== "BODY") setPicked(describe(el));
-  }, [describe]);
+  const selectBigger = () => {
+    const parent = selectedEl?.parentElement;
+    if (!parent || parent === root) return;
+    const named = variant === "B" ? nearestNamed(parent, root) : sectionOf(parent, root);
+    if (named) setPicked(describe(named));
+  };
+  const canGoBigger = !!selectedEl && selectedEl.parentElement !== root && !!root;
 
   if (!variant) return { onWorkingDocument: undefined, send, composerAddon: null, overlay: null };
 
-  const composerAddon: ReactNode =
-    variant !== "C" ? (
-      <div className="proto-chip-row">
-        {picked ? (
-          <>
-            <span className="proto-chip">
-              📍 About: <strong>{picked.label}</strong>
-              {variant === "A" && (
-                <button type="button" className="proto-bigger" onClick={selectBigger}>
-                  Select bigger
-                </button>
-              )}
-              <button type="button" aria-label="Clear selection" onClick={() => setPicked(null)}>
-                ×
+  const parts = variant === "C" && selectedEl && sectionOf(selectedEl, root) === selectedEl ? namedParts(selectedEl) : [];
+  const hint: Record<Variant, string> = {
+    A: "Tip: click a section of the working slip, then click inside it to pick a smaller part.",
+    B: "Tip: click any part of the working slip; Select bigger widens it.",
+    C: "Tip: click a section of the working slip, then narrow it with the part buttons.",
+  };
+
+  const composerAddon: ReactNode = (
+    <div className="proto-chip-row">
+      {picked ? (
+        <>
+          <span className="proto-chip">
+            📍 About: <strong>{picked.label}</strong>
+            {canGoBigger && (
+              <button type="button" className="proto-bigger" onClick={selectBigger}>
+                Select bigger
               </button>
-            </span>
-            <div className="proto-context">
-              Flint also gets: <code>{picked.context}</code>
-            </div>
-          </>
-        ) : (
-          <span className="proto-hint">
-            {variant === "A"
-              ? "Tip: click anything on the working slip to talk about exactly that."
-              : "Tip: click a section of the working slip to talk about just that section."}
+            )}
+            <button type="button" aria-label="Clear selection" onClick={() => setPicked(null)}>
+              ×
+            </button>
           </span>
-        )}
-      </div>
-    ) : null;
+          {parts.length > 0 && (
+            <div className="proto-parts">
+              {parts.map((p) => (
+                <button
+                  key={classesOf(p)[0]}
+                  type="button"
+                  onMouseEnter={() => p.setAttribute("data-proto-hover", "")}
+                  onMouseLeave={() => p.removeAttribute("data-proto-hover")}
+                  onClick={() => {
+                    p.removeAttribute("data-proto-hover");
+                    setPicked(describe(p));
+                  }}
+                >
+                  {labelFor(p)}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="proto-context">
+            Flint also gets: <code>{picked.context}</code>
+          </div>
+        </>
+      ) : (
+        <span className="proto-hint">{hint[variant]}</span>
+      )}
+    </div>
+  );
 
   const overlay = createPortal(
-    <>
-      {popover && (
-        <PointAndAsk
-          popover={popover}
-          onSend={(text) => {
-            send(withContext(text, popover.picked.context));
-            setPopover(null);
-            setPicked(null);
-          }}
-          onClose={() => {
-            setPopover(null);
-            setPicked(null);
-          }}
-        />
-      )}
-      <div className="proto-switcher" role="toolbar" aria-label="Prototype variant">
-        <button type="button" onClick={() => choose(VARIANTS[(VARIANTS.indexOf(variant) + 2) % 3]!)}>
-          ←
-        </button>
-        <span>
-          PROTOTYPE {variant} ({NAMES[variant]})
-        </span>
-        <button type="button" onClick={() => choose(VARIANTS[(VARIANTS.indexOf(variant) + 1) % 3]!)}>
-          →
-        </button>
-      </div>
-    </>,
+    <div className="proto-switcher" role="toolbar" aria-label="Prototype variant">
+      <button type="button" onClick={() => choose(VARIANTS[(VARIANTS.indexOf(variant) + 2) % 3]!)}>
+        ←
+      </button>
+      <span>
+        PROTOTYPE {variant} ({NAMES[variant]})
+      </span>
+      <button type="button" onClick={() => choose(VARIANTS[(VARIANTS.indexOf(variant) + 1) % 3]!)}>
+        →
+      </button>
+    </div>,
     document.body,
   );
 
   return { onWorkingDocument, send: sendWithSelection, composerAddon, overlay };
-}
-
-const QUICK = ["Make it bigger", "Make it bold", "Hide it", "Move it to the bottom"];
-
-function PointAndAsk({ popover, onSend, onClose }: { popover: Popover; onSend: (t: string) => void; onClose: () => void }) {
-  const [text, setText] = useState("");
-  const { label, context } = popover.picked;
-  return (
-    <div className="proto-popover" style={{ left: popover.x, top: popover.y }}>
-      <div className="proto-popover-head">
-        <strong>{label}</strong>
-        <button type="button" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      <div className="proto-popover-chips">
-        {QUICK.map((q) => (
-          <button key={q} type="button" onClick={() => onSend(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) onSend(text.trim());
-        }}
-      >
-        <input autoFocus value={text} placeholder={`Change the ${label.toLowerCase()}…`} onChange={(e) => setText(e.target.value)} />
-      </form>
-      <div className="proto-context">
-        Flint also gets: <code>{context}</code>
-      </div>
-    </div>
-  );
 }
