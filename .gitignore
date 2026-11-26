@@ -16,5 +16,6 @@ limit-test/results/
 # OS / editor
 .DS_Store
 
-# Claude Code personal overrides
-.claude/settings.local.json
+# Claude Code: only project skills are committed
+.claude/*
+!.claude/skills/
