@@ -18,6 +18,8 @@ type Props = {
   onSaved?: (template: Template) => void;
   /** Told whenever the working slip starts or stops differing from what was opened or last saved. */
   onUnsavedChange?: (unsaved: boolean) => void;
+  /** Replay mode's suggestion chips, when replay is on for this shop. */
+  replayChips?: string[];
 };
 
 /**
@@ -25,7 +27,7 @@ type Props = {
  * chat with Flint. Mount it with a key per session so opening another template starts a fresh one.
  * The template prop may change while mounted (after Save as new); the session carries on.
  */
-export function Editor({ shop, template, onSaved, onUnsavedChange }: Props) {
+export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }: Props) {
   const uploads = useUploadedAssets(shop);
   const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
   const unsaved = hasUnsavedChanges(session.state);
@@ -85,6 +87,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange }: Props) {
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
         onUpload={upload}
+        replayChips={replayChips}
       />
     </div>
   );

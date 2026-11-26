@@ -7,7 +7,7 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
       // Test secrets live here so tests never depend on a local .dev.vars. Ember itself is faked.
-      miniflare: { bindings: { EMBER_API_KEY: "test-ember-key" } },
+      miniflare: { bindings: { EMBER_API_KEY: "test-ember-key", ACCESS_CODE: "test-access-code" } },
     }),
   ],
   test: {

@@ -3,6 +3,7 @@ import type { Turn } from "../session/session";
 import type { OnUpload } from "./AssetUpload";
 import { Composer } from "./Composer";
 import { FlintMessage } from "./FlintMessage";
+import { ReplayChips } from "./ReplayChips";
 
 type Props = {
   turns: Turn[];
@@ -12,10 +13,12 @@ type Props = {
   retryTurnId?: number;
   onTryAgain?: () => void;
   onUpload?: OnUpload;
+  /** Replay mode's suggestion chips, shown above the message box. */
+  replayChips?: string[];
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, replayChips }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -61,6 +64,7 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
         )}
         <div ref={end} />
       </div>
+      {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
       <Composer disabled={thinking} onSend={onSend} />
     </aside>
   );

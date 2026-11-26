@@ -574,3 +574,72 @@ body {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* Access code and replay mode. */
+.access {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.mode-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mode-replay {
+  background: #fbeee8;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.mode-live {
+  background: #e7f4ea;
+  color: #2f7a45;
+  border: 1px solid #2f7a45;
+}
+
+.access-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.access-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.access-form input {
+  font: inherit;
+  padding: 3px 6px;
+  width: 140px;
+}
+
+.access-error {
+  color: #a3361a;
+  font-size: 13px;
+}
+
+.replay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

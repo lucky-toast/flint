@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "../../src/worker";
-import { classic, postTurn, randomIp, randomSession } from "./client";
+import { classic, postTurn, randomIp, randomSession, turnHeaders } from "./client";
 import { fakeEmber, toolCall, type EmberCall } from "./fake-ember";
 
 const reply = () => toolCall("reply", { message: "Hi 👋" });
@@ -17,7 +17,7 @@ async function sendTurns(count: number, options: { ip?: string; session?: string
 async function turnWith(overrides: Partial<Env>) {
   const init = {
     method: "POST",
-    headers: { "content-type": "application/json", "cf-connecting-ip": randomIp() },
+    headers: turnHeaders(),
     body: JSON.stringify({ shopId: "kiln-and-co", templateSource: classic, history: [], message: "Sort items" }),
   };
   return (await worker.fetch(new Request("http://flint.test/api/turn", init), { ...env, ...overrides })).json();
