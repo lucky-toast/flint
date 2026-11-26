@@ -25,7 +25,7 @@ Restart `npm start` after editing `.dev.vars`.
 ## Live and replay
 
 - **Replay** (default, no code): the header shows a Replay badge. On Kiln & Co., chips play recorded responses for the demo requests. Replay spends nothing.
-- **Live**: click "Have an access code?" in the header and enter your `ACCESS_CODE`. The badge switches to Live, and requests go to Muse Ember (capped at $3 in total by `TOKEN_BUDGET_USD` in `wrangler.jsonc`).
+- **Live**: click "Have an access code?" in the header and enter your `ACCESS_CODE`. The badge switches to Live, and requests go to Muse Ember (capped at $3 in total by `TOKEN_BUDGET_USD` in `wrangler.jsonc`). Each browser tab gets 50 live messages in total (`SESSION_MESSAGE_CAP`) and each IP about 10 a minute; past either, requests rest.
 
 ## Turn logs
 
@@ -47,4 +47,23 @@ If Playwright can't find its browser under `\ms-playwright\…`, your shell has 
 
 ## Production
 
-Set secrets with `npx wrangler secret put EMBER_API_KEY` and `npx wrangler secret put ACCESS_CODE`. Use a long, random access code. Set `LIVE_MODE` to anything other than `on` to turn live mode off.
+Flint deploys as one Worker on the Custom Domain in `wrangler.jsonc` (`routes`). The domain's zone must be on the Cloudflare account wrangler is logged into (`npx wrangler whoami`), and the hostname must not already have a DNS record: Cloudflare creates the record and certificate on the first deploy.
+
+First deploy:
+
+```sh
+npx wrangler login               # if whoami shows no account
+npx wrangler secret put EMBER_API_KEY
+npx wrangler secret put ACCESS_CODE
+npm run deploy                   # build, then wrangler deploy to the top-level (production) environment
+```
+
+`secret put` creates the Worker if it doesn't exist yet. Use a long, random access code. Secrets persist across deploys, so later deploys are just `npm run deploy`.
+
+Check it:
+
+- Open the public URL without a code: Replay badge, all three shops load, replay chips play on Kiln & Co.
+- `https://<hostname>/api/status` reports live state and remaining budget.
+- Enter the access code: the badge switches to Live and a request goes through.
+
+Kill switch: set `LIVE_MODE` in `wrangler.jsonc` to `off` and run `npm run deploy` (or edit the variable under Workers & Pages > flint > Settings > Variables and secrets in the dashboard, which takes effect immediately but is overwritten by the next deploy). `/api/status` should then report `"live": false`, and with the code entered a new request gets the resting reply instead of reaching Muse Ember (replay chips still play). Set it back to `on` and deploy again to restore live mode.

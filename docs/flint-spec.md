@@ -204,7 +204,7 @@ Slips render in a sandboxed iframe with scripts disabled, under a content securi
 |---|---|---|
 | Access code | Without a valid code the request is served in replay mode | Shared with judges |
 | Global cap | Budget Durable Object: reserve the worst case before each call, settle after, refuse at the cap; cached input is tracked separately | **$3**, leaving room under the $10 limit for development and recording |
-| Rate limits | Workers rate-limiting binding | About 10 messages/min per IP, 20 per session |
+| Rate limits | Workers rate-limiting binding; a Durable Object per session | About 10 messages/min per IP; 50 live messages per session (browser tab) in total |
 | Per call | 4,000 output-token cap, at most 2 retries, no retry on truncation | |
 | Input | Message ≤ 500 characters, history about 10 turns | |
 | Kill switch | Live-mode variable off | |

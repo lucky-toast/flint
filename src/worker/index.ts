@@ -18,6 +18,7 @@ import { ACCESS_CODE_NOTE, REPLAY_OTHER_SHOP, replayTurn } from "./replay";
 import { parseTurnRequest } from "./turn-request";
 
 export { BudgetDO } from "./budget";
+export { SessionCapDO } from "./session-cap";
 
 /** Live mode: the kill switch is on and a model key is configured. Each turn also needs the access code. */
 function isLive(env: Env): boolean {

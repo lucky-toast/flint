@@ -65,16 +65,36 @@ describe("POST /api/turn, rate limits", () => {
     expect(await (await postTurn({}, { ip: randomIp() })).json()).toMatchObject({ type: "reply" });
   }, 15_000);
 
-  it("allows 20 messages a minute per session, even across IPs, then rests", async () => {
-    const calls = fakeEmber(...Array.from({ length: 20 }, reply));
+  it("allows 50 messages per session in total, even across IPs, then rests", async () => {
+    const calls = fakeEmber(...Array.from({ length: 50 }, reply));
     const session = randomSession();
-    await freshRateLimitWindow();
 
     const results: any[] = [];
-    for (let i = 0; i < 21; i++) results.push(await (await postTurn({}, { session, ip: randomIp() })).json());
+    for (let i = 0; i < 51; i++) results.push(await (await postTurn({}, { session, ip: randomIp() })).json());
 
-    expect(results.slice(0, 20).every((r) => r.type === "reply")).toBe(true);
-    expect(results[20]).toEqual(RESTING);
-    expect(calls).toHaveLength(20);
-  }, 15_000);
+    expect(results.slice(0, 50).every((r) => r.type === "reply")).toBe(true);
+    expect(results[50]).toEqual(RESTING);
+    expect(calls).toHaveLength(50);
+  }, 30_000);
+
+  it("counts each session separately", async () => {
+    fakeEmber(...Array.from({ length: 51 }, reply));
+    const session = randomSession();
+    for (let i = 0; i < 50; i++) await postTurn({}, { session, ip: randomIp() });
+
+    expect(await (await postTurn({}, { session: randomSession() })).json()).toMatchObject({ type: "reply" });
+  }, 30_000);
+
+  it("doesn't count a message the IP limit refused against the session's cap", async () => {
+    fakeEmber(...Array.from({ length: 60 }, reply));
+    const session = randomSession();
+    for (let i = 0; i < 49; i++) await postTurn({}, { session, ip: randomIp() });
+    const busyIp = randomIp();
+    await freshRateLimitWindow();
+    await sendTurns(10, { ip: busyIp });
+    expect(await (await postTurn({}, { session, ip: busyIp })).json()).toEqual(RESTING);
+
+    // The refused message didn't use up the 50th.
+    expect(await (await postTurn({}, { session, ip: randomIp() })).json()).toMatchObject({ type: "reply" });
+  }, 30_000);
 });
