@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type { Paper, Shop, Template } from "../../core";
-import { readSavedTemplates, writeSavedTemplates } from "./saved-templates";
+import { readSavedTemplates, STORAGE_PREFIX, writeSavedTemplates } from "./saved-templates";
 
 // One cached list per shop, so every component sees the same array until a save changes it.
 const cache = new Map<string, Template[]>();
@@ -16,7 +16,7 @@ function subscribe(listener: () => void) {
   listeners.add(listener);
   // Saves from another tab of the app.
   const onStorage = (e: StorageEvent) => {
-    if (e.key === null || e.key.startsWith("flint:templates:")) changed();
+    if (e.key === null || e.key.startsWith(STORAGE_PREFIX)) changed();
   };
   window.addEventListener("storage", onStorage);
   return () => {

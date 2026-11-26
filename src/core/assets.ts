@@ -7,8 +7,11 @@ import { placeholderAssets } from "./validate";
 /** How many uploaded asset names one turn may carry. */
 export const MAX_UPLOADED_ASSETS = 20;
 
+/** The longest asset name. */
+export const MAX_ASSET_NAME_LENGTH = 32;
+
 /** Asset names are plain identifiers so `assets.<name>` works in Liquid: a letter, then letters, digits or _. */
-export const ASSET_NAME_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+export const ASSET_NAME_PATTERN = new RegExp(`^[a-z][a-z0-9_]{0,${MAX_ASSET_NAME_LENGTH - 1}}$`);
 
 export function isAssetName(value: unknown): value is string {
   return typeof value === "string" && ASSET_NAME_PATTERN.test(value);
@@ -21,8 +24,8 @@ export function uploadFollowUp(name: string): string {
 
 /** The uploaded name in an uploadFollowUp message, if the message is one (replay answers it). */
 export function uploadFollowUpName(message: string): string | undefined {
-  const match = /^I've supplied the ([a-z][a-z0-9_]{0,31}) resource: /.exec(message.trim());
-  return match?.[1];
+  const name = /^I've supplied the (\S+) resource: /.exec(message.trim())?.[1];
+  return isAssetName(name) ? name : undefined;
 }
 
 /** The shop as the Worker sees it for a turn: its own assets plus placeholders for the uploaded names. */

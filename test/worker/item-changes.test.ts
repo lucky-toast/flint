@@ -78,6 +78,25 @@ describe("item-change counter", () => {
     expect(whatChanged(changes)).toBe("#1003: 1 item missing · prices hidden on 1 order");
   });
 
+  it("finds titles with an apostrophe (Second Stitch's Levi's 501 Jeans), escaped on the slip", async () => {
+    const stitch = shops.find((s) => s.id === "second-stitch")!;
+    expect(await compareItems(classic, classic.replace("Thank you", "Thanks"), stitch)).toMatchObject({ orders: [] });
+
+    const after = withItems(`order.lineItems | where_exp: "item", "item.sku != 'JNS-501-W32'"`);
+    const changes = await compareItems(classic, after, stitch);
+
+    expect(missingItemsWarning(changes)).toBe("⚠️ Missing items: Levi's 501 Jeans on #2001");
+  });
+
+  it("reports nothing on an unchanged slip whose order text has an ampersand (Sticker Barn)", async () => {
+    const barn = shops.find((s) => s.id === "sticker-barn")!;
+    expect(barn.orders.some((o) => o.buyer.includes("&"))).toBe(true);
+
+    const changes = await compareItems(classic, classic.replace("Thank you", "Thanks"), barn);
+
+    expect(changes.orders).toEqual([]);
+  });
+
   it("still counts a title shown in capitals or across escaped characters", async () => {
     const after = classic.replace("{{ item.title | escape }}", "{{ item.title | upcase | escape }}");
 

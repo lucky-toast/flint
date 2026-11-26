@@ -92,6 +92,9 @@ const server = createServer(async (req, res) => {
         if (typeof match !== "string" || !match || !Array.isArray(responses)) {
           return send(res, 400, { error: "expected { match: string, responses: [], delayMs?: number }" });
         }
+        // Two live scripts with the same match text would answer each other's turns: tests must use distinct text.
+        const clash = [...scripts.values()].find((s) => s.match === match);
+        if (clash) console.error(`[fake-ember] scripts ${clash.id} and ${nextId} share the match text: ${match}`);
         const id = String(nextId++);
         scripts.set(id, { id, match, responses, delayMs: Number(delayMs) || 0, calls: [] });
         return send(res, 200, { id });
