@@ -4,11 +4,16 @@
 !.env.example
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
+# Placeholder vars for the browser tests (no secrets; see the file)
+!.dev.vars.e2e
 
 # Dependencies and build output
 node_modules/
 dist/
 .wrangler/
+test-results/
+playwright-report/
 
 # Limit-test output (raw API requests/responses)
 limit-test/results/
@@ -19,3 +24,6 @@ limit-test/results/
 # Claude Code: only project skills are committed
 .claude/*
 !.claude/skills/
+
+# Local turn logs (npm start) and their review pages
+logs/

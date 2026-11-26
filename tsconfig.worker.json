@@ -1,0 +1,10 @@
+{
+  // Worker runtime: the Worker, the Core and Data it imports, and the Worker tests.
+  // Runtime and binding types come from worker-configuration.d.ts (regenerate with `npm run cf-typegen`).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["worker-configuration.d.ts", "src/worker", "src/core", "src/data", "test/worker"]
+}

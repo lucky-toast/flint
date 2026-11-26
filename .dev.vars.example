@@ -1,0 +1,11 @@
+# Copy to .dev.vars (ignored by git) and fill in real values for local development.
+# In production, set these with `wrangler secret put <NAME>`.
+
+# Muse Ember (Meta Responses API) key.
+EMBER_API_KEY=
+
+# Access code that unlocks live mode; visitors without it get replay mode.
+ACCESS_CODE=
+
+# Optional: point the Worker at another Responses API endpoint (e.g. a local fake Ember).
+# MODEL_API_BASE_URL=http://127.0.0.1:8789/v1

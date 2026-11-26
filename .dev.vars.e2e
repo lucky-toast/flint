@@ -1,0 +1,6 @@
+# Committed on purpose: the browser tests' (`wrangler dev --env e2e`) local vars. Because this file
+# exists, wrangler loads it *instead of* .dev.vars, so a developer's real key never reaches e2e.
+# The key is a placeholder that only the fake Ember accepts. Never put a real secret here.
+EMBER_API_KEY=fake-ember-key
+# The browser tests' access code (E2E_ACCESS_CODE in test/e2e/support/access.ts), also a placeholder.
+ACCESS_CODE=e2e-access-code

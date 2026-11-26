@@ -1,0 +1,645 @@
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #1f1b18;
+  background: #efebe7;
+  --line: #ddd5ce;
+  --muted: #6b5f57;
+  --accent: #b5532f;
+}
+
+body {
+  margin: 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.app-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.app-main {
+  padding: 16px 24px;
+}
+
+/* Editor: toolbar on top, the two slips side by side, the chat on the right. */
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-areas:
+    "toolbar toolbar"
+    "panes chat";
+  gap: 16px;
+  align-items: start;
+}
+
+.editor-toolbar {
+  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.order-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.order-picker select {
+  font: inherit;
+  color: #1f1b18;
+  padding: 4px 8px;
+}
+
+.editor-panes {
+  grid-area: panes;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.slip-pane h2,
+.chat h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.slip-status {
+  color: var(--muted);
+}
+
+/* The frame is laid out at the paper's real size and scaled to fit this box. */
+.slip-preview-box {
+  width: 100%;
+  overflow: hidden;
+}
+
+.slip-preview {
+  display: block;
+  border: none;
+  background: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.12);
+  transform-origin: top left;
+}
+
+/* Chat */
+.chat {
+  grid-area: chat;
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 360px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* An undone turn stays in the chat, faded, with an "Undone" mark. */
+.turn-undone .message {
+  opacity: 0.5;
+}
+
+.turn-undone .message-flint p {
+  text-decoration: line-through;
+}
+
+.turn-mark {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.try-again {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.message {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-seller {
+  align-self: flex-end;
+  background: #2b211c;
+  color: #fff;
+}
+
+.message-flint {
+  align-self: flex-start;
+  background: #f4efea;
+}
+
+.message-error {
+  background: #fbeee8;
+  border: 1px solid #f0cdbf;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip {
+  padding: 4px 10px;
+  border: 1px solid #b5532f;
+  border-radius: 999px;
+  background: #fff;
+  color: #b5532f;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: #fbeee8;
+}
+
+.thinking {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.composer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.composer-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.composer button {
+  font: inherit;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.show-code {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.show-code-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.code-view h3 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.code-diff,
+.code-source {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbf9f7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.code-diff > div {
+  white-space: pre;
+}
+
+.diff-sign {
+  display: inline-block;
+  width: 1.5em;
+  color: var(--muted);
+}
+
+.diff-added {
+  background: #e6f4ea;
+}
+
+.diff-removed {
+  background: #fbe9e7;
+}
+
+.diff-skip {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.code-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* What changed + item warnings under the working slip */
+.item-changes {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.item-changes p {
+  margin: 0 0 4px;
+}
+
+.what-changed {
+  color: var(--muted);
+}
+
+.item-warning {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #fff4dc;
+  border: 1px solid #f0d9a0;
+}
+
+/* Shop switcher and template picker */
+.shop-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.shop-switcher select {
+  font: inherit;
+  color: #1f1b18;
+  padding: 4px 8px;
+}
+
+.app-header-button {
+  margin-left: auto;
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.template-picker h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.template-picker section + section {
+  margin-top: 24px;
+}
+
+.template-picker-empty {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.template-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.template-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.template-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.template-paper {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.template-card-preview {
+  flex: 1;
+}
+
+.template-card button {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Save, download and print, at the end of the editor toolbar. */
+.slip-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.slip-actions button,
+.modal button {
+  font: inherit;
+  font-size: 14px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.slip-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.modal {
+  width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.modal::backdrop {
+  background: rgb(31 27 24 / 0.35);
+}
+
+.modal h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.modal p {
+  margin: 0 0 16px;
+}
+
+.save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.save-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.save-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 24px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.save-field input,
+.save-field select {
+  font: inherit;
+  color: #1f1b18;
+  padding: 4px 8px;
+}
+
+.save-error {
+  color: #a3261b;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.modal button.danger {
+  border-color: #a3261b;
+  background: #a3261b;
+  color: #fff;
+}
+
+.asset-upload {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.asset-upload input[type="text"] {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.asset-upload button {
+  justify-self: start;
+  font: inherit;
+  padding: 4px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.asset-upload button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.asset-upload-error {
+  color: #a3361a;
+}
+
+.asset-upload-done {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Access code and replay mode. */
+.access {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.mode-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mode-replay {
+  background: #fbeee8;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.mode-live {
+  background: #e7f4ea;
+  color: #2f7a45;
+  border: 1px solid #2f7a45;
+}
+
+.access-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.access-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.access-form input {
+  font: inherit;
+  padding: 3px 6px;
+  width: 140px;
+}
+
+.access-error {
+  color: #a3361a;
+  font-size: 13px;
+}
+
+.replay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
