@@ -21,6 +21,8 @@ export type SessionApi = {
   send: (message: string) => void;
   /** Steps the working slip back one version. Ignored when there's nothing to undo. */
   undo: () => void;
+  /** Reapplies the most recently undone version. Ignored when the Redo stack is empty. */
+  redo: () => void;
   /**
    * Sets the latest edit aside and asks Flint for a different approach to the same request. If
    * Flint can't, the edit comes back and Flint's error shows as a note.
@@ -81,6 +83,7 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
   );
 
   const undo = useCallback(() => apply({ type: "undid" }), [apply]);
+  const redo = useCallback(() => apply({ type: "redid" }), [apply]);
 
   const tryAgain = useCallback(() => {
     const current = latest.current;
@@ -94,5 +97,5 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
 
   const saved = useCallback(() => apply({ type: "saved" }), [apply]);
 
-  return { state, thinking: !!pendingTurn(state), send, undo, tryAgain, saved };
+  return { state, thinking: !!pendingTurn(state), send, undo, redo, tryAgain, saved };
 }

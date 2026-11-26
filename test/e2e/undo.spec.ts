@@ -1,4 +1,4 @@
-import { editCall, emberDown, expect, test } from "./support/ember";
+import { editCall, emberDown, expect, replyCall, test } from "./support/ember";
 import { editor } from "./support/editor";
 
 const THANK_YOU = "Thank you for supporting";
@@ -149,4 +149,75 @@ test("Try again works after a summary longer than a message", async ({ page, emb
   await expect(ed.working.getByText("Snug thanks for supporting")).toBeVisible();
   const [call] = await retry.calls();
   expect(call.input[0].content).not.toContain("TAIL-OF-SUMMARY");
+});
+
+test("Undo enables Redo and warns that the next message clears it", async ({ page, ember }) => {
+  await ember.onRequest(
+    "Say cheers on the thank-you line (redo warning)",
+    editCall([{ find: "Thank you for supporting", replace: "Cheers for supporting" }], "It says cheers now 🥂"),
+  );
+  const ed = editor(page);
+  await page.goto("/");
+  await expect(ed.redoButton).toBeDisabled();
+  await expect(ed.redoWarning).toHaveCount(0);
+
+  await ed.send("Say cheers on the thank-you line (redo warning)");
+  await expect(ed.working.getByText("Cheers for supporting")).toBeVisible();
+  await expect(ed.redoButton).toBeDisabled();
+
+  await ed.undoButton.click();
+
+  await expect(ed.redoButton).toBeEnabled();
+  await expect(ed.redoWarning).toBeVisible();
+});
+
+test("Redo brings the undone edit back and removes the Undone mark", async ({ page, ember }) => {
+  const request = "Say cheers on the thank-you line (redo)";
+  await ember.onRequest(
+    request,
+    editCall([{ find: "Thank you for supporting", replace: "Cheers for supporting" }], "It says cheers now 🥂"),
+  );
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send(request);
+  await expect(ed.working.getByText("Cheers for supporting")).toBeVisible();
+  await ed.undoButton.click();
+  await expect(ed.working.getByText(THANK_YOU)).toBeVisible();
+
+  await ed.redoButton.click();
+
+  await expect(ed.working.getByText("Cheers for supporting")).toBeVisible();
+  const turn = ed.turn(request);
+  await expect(turn).not.toHaveAttribute("data-undone", "true");
+  await expect(turn.getByText("Undone")).toHaveCount(0);
+  await expect(ed.redoButton).toBeDisabled();
+  await expect(ed.redoWarning).toHaveCount(0);
+  // As before the Undo: Try again is back and the edit can be undone again.
+  await expect(ed.tryAgainButton).toBeVisible();
+  await expect(ed.undoButton).toBeEnabled();
+});
+
+test("sending after Undo clears Redo and the undone turn stays undone", async ({ page, ember }) => {
+  const request = "Say cheers on the thank-you line (redo cleared)";
+  await ember.onRequest(
+    request,
+    editCall([{ find: "Thank you for supporting", replace: "Cheers for supporting" }], "It says cheers now 🥂"),
+  );
+  await ember.onRequest("What font is this? (redo cleared)", replyCall("It's a serif 🖋️"));
+  const ed = editor(page);
+  await page.goto("/");
+
+  await ed.send(request);
+  await expect(ed.working.getByText("Cheers for supporting")).toBeVisible();
+  await ed.undoButton.click();
+  await expect(ed.redoButton).toBeEnabled();
+
+  await ed.send("What font is this? (redo cleared)");
+  await expect(ed.flintSays("It's a serif 🖋️")).toBeVisible();
+
+  await expect(ed.redoButton).toBeDisabled();
+  await expect(ed.redoWarning).toHaveCount(0);
+  await expect(ed.turn(request)).toHaveAttribute("data-undone", "true");
+  await expect(ed.turn(request).getByText("Undone")).toBeVisible();
 });

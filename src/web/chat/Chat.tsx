@@ -13,12 +13,14 @@ type Props = {
   retryTurnId?: number;
   onTryAgain?: () => void;
   onUpload?: OnUpload;
+  /** Whether Redo has something to reapply: the next message would clear it, so say so. */
+  redoPending?: boolean;
   /** Replay mode's suggestion chips, shown above the message box. */
   replayChips?: string[];
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
-export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, replayChips }: Props) {
+export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUpload, redoPending, replayChips }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -66,6 +68,7 @@ export function Chat({ turns, thinking, onSend, retryTurnId, onTryAgain, onUploa
         <div ref={end} />
       </div>
       {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
+      {redoPending && <p className="redo-warning">Your next message clears Redo.</p>}
       <Composer disabled={thinking} onSend={onSend} />
     </aside>
   );

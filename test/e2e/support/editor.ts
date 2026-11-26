@@ -21,6 +21,9 @@ export function editor(page: Page) {
     sendButton: page.getByRole("button", { name: "Send" }),
     thinking: page.getByText("Flint is thinking…"),
     undoButton: page.getByRole("button", { name: "Undo" }),
+    redoButton: page.getByRole("button", { name: "Redo" }),
+    /** The line above the message box while Redo has something to reapply. */
+    redoWarning: page.getByText("Your next message clears Redo."),
     tryAgainButton: chat.getByRole("button", { name: "Try again" }),
     /** The chat turn whose seller message contains this text. */
     turn: (text: string) => chat.locator(".turn", { has: page.locator('[data-author="seller"]', { hasText: text }) }),

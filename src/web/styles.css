@@ -147,6 +147,14 @@ body {
   font-style: italic;
 }
 
+/* While Redo has something to reapply, above the message box. */
+.redo-warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
 .try-again {
   align-self: flex-start;
   font: inherit;
