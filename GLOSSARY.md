@@ -36,3 +36,13 @@ A top-level part of the slip, such as the header, ship-to, items table, totals o
 **Selection**:
 The part the seller picked on the working slip. Flint is told only enough to find it in the template: the part's name and its opening tag, copied from the template source, plus which occurrence it is when that tag appears more than once. It never describes the rendered slip, since Flint never sees the example orders. It travels with the turn, stays in the history Flint sees, and clears whenever the working slip re-renders (after an edit, Undo or Redo, or an example-order switch).
 _Avoid_: highlight, focus
+
+## Running inside the seller's app
+
+**Host app**:
+The seller's own desktop app when it opens Flint through its "Design with Flint" menu item. It supplies the template and the shop and stores what Flint saves.
+_Avoid_: the original (that means the original slip), parent app
+
+**Embedded mode**:
+Flint running inside a host app: no shop or template picker, the access code supplied by the host, and saving back to the host.
+_Avoid_: sidecar, plugin mode
