@@ -39,7 +39,7 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
       {/* Every pane has the same four rows (lined up across panes), so notes never push one slip below the other. */}
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
-        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} glow={glowOnChange ? glow : 0} />}
+        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} glow={glowOnChange ? glow : 0} desk />}
         {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
         {rendered.status === "error" && (
           <p className="slip-status" role="alert">

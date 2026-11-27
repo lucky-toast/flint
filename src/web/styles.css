@@ -127,6 +127,27 @@ body {
   position: relative;
 }
 
+/* The editor's desk: a dark surface sized for the largest paper, so a 4×6 label reads as small. */
+.slip-desk {
+  border-radius: 8px;
+  background: #3a332e;
+  box-shadow: inset 0 1px 6px rgb(0 0 0 / 0.35);
+}
+
+.slip-desk .slip-preview {
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.45);
+}
+
+.slip-desk-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgb(255 255 255 / 0.55);
+  pointer-events: none;
+}
+
 .slip-glow {
   position: absolute;
   top: 0;

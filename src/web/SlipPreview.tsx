@@ -9,6 +9,8 @@ type Props = {
   onDocument?: (doc: Document) => void;
   /** Bumped to make the sheet glow for a moment; 0 for none. */
   glow?: number;
+  /** Show the sheet on a dark desk sized for the largest paper, so its real size reads at a glance. */
+  desk?: boolean;
 };
 
 const PX_PER_UNIT: Record<string, number> = { in: 96, mm: 96 / 25.4 };
@@ -34,37 +36,51 @@ function blockLinks(event: SyntheticEvent<HTMLIFrameElement>) {
   );
 }
 
+/** The desk fits the largest paper (Letter's width, A4's height), so every sheet shares one scale. */
+const DESK_PAPER = { width: toPx(PAPER_SIZES.letter.width), height: toPx(PAPER_SIZES.a4.height) };
+const DESK_PADDING = 20;
+const PAPER_CAPTIONS: Record<Paper, string> = { letter: "Letter · 8.5 × 11 in", a4: "A4 · 210 × 297 mm", "4x6": "4 × 6 in label" };
+
 /**
  * Shows rendered slip HTML in a sandboxed iframe (scripts disabled) whose document carries the
  * preview CSP, so template content can't run code or load anything from other sites. Link clicks
  * inside it are cancelled, so it can't navigate away either.
- * The frame is laid out at the paper's real size and scaled down to fit its container.
+ * The frame is laid out at the paper's real size and scaled down (never up) to fit its container.
  */
-export function SlipPreview({ html, paper, title = "Slip preview", onDocument, glow = 0 }: Props) {
+export function SlipPreview({ html, paper, title = "Slip preview", onDocument, glow = 0, desk = false }: Props) {
   const size = PAPER_SIZES[paper];
   const width = toPx(size.width);
   const height = toPx(size.height);
   const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [boxWidth, setBoxWidth] = useState(width);
 
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const fit = () => setScale(Math.min(1, el.clientWidth / width));
+    const fit = () => setBoxWidth(el.clientWidth);
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [width]);
+  }, []);
+
+  // On the desk, every paper uses the scale that fits the largest one, so a 4×6 label looks as much
+  // smaller than a Letter sheet as it really is; it sits centred. Without the desk, the sheet fills the width.
+  const scale = desk
+    ? Math.min(1, (boxWidth - 2 * DESK_PADDING) / DESK_PAPER.width)
+    : Math.min(1, boxWidth / width);
+  const boxHeight = desk ? DESK_PAPER.height * scale + 2 * DESK_PADDING : height * scale;
+  const left = desk ? (boxWidth - width * scale) / 2 : 0;
+  const top = desk ? (boxHeight - height * scale) / 2 : 0;
 
   return (
-    <div ref={box} className="slip-preview-box" style={{ height: height * scale }}>
+    <div ref={box} className={desk ? "slip-preview-box slip-desk" : "slip-preview-box"} style={{ height: boxHeight }}>
       {glow > 0 && (
         <div
           key={glow}
           className="slip-glow"
           aria-hidden="true"
-          style={{ width: width * scale, height: height * scale, left: scale === 1 ? `calc(50% - ${width / 2}px)` : 0 }}
+          style={{ width: width * scale, height: height * scale, left, top }}
         />
       )}
       <iframe
@@ -78,9 +94,13 @@ export function SlipPreview({ html, paper, title = "Slip preview", onDocument, g
           const doc = e.currentTarget.contentDocument;
           if (doc && onDocument) onDocument(doc);
         }}
-        // Centred when the paper fits at full size (a 4×6 label in a wide pane); scaled from the left edge otherwise.
-        style={{ width: size.width, height: size.height, transform: `scale(${scale})`, margin: scale === 1 ? "0 auto" : undefined }}
+        style={{ width: size.width, height: size.height, transform: `translate(${left}px, ${top}px) scale(${scale})` }}
       />
+      {desk && (
+        <span className="slip-desk-caption" aria-hidden="true">
+          {PAPER_CAPTIONS[paper]}
+        </span>
+      )}
     </div>
   );
 }
