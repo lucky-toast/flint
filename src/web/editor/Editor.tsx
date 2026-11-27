@@ -63,14 +63,6 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
     <div className="editor">
       <div className="editor-toolbar">
         <OrderPicker orders={shop.orders} orderId={order.id} onChange={switchOrder} />
-        <div className="undo-redo" role="group" aria-label="History">
-          <button type="button" onClick={session.undo} disabled={!canUndo(session.state)} title="Undo Flint's last edit">
-            <span aria-hidden="true">↶</span> Undo
-          </button>
-          <button type="button" onClick={session.redo} disabled={!canRedo(session.state)} title="Redo the edit you undid">
-            Redo <span aria-hidden="true">↷</span>
-          </button>
-        </div>
         <SlipActions
           shop={shop}
           template={template}
@@ -121,6 +113,18 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
                 </button>
               )}
             </>
+          }
+          overlay={
+            // Undo and Redo float on the working desk, and only while there's something to undo or redo.
+            <div className="desk-history" role="group" aria-label="History" hidden={!canUndo(session.state) && !canRedo(session.state)}>
+              <button type="button" aria-label="Undo" title="Undo" onClick={session.undo} disabled={!canUndo(session.state)}>
+                ↶
+              </button>
+              <span className="desk-history-sep" aria-hidden="true" />
+              <button type="button" aria-label="Redo" title="Redo" onClick={session.redo} disabled={!canRedo(session.state)}>
+                ↷
+              </button>
+            </div>
           }
           cover={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
         >

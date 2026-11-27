@@ -20,8 +20,9 @@ export function editor(page: Page) {
     input,
     sendButton: page.getByRole("button", { name: "Send" }),
     thinking: page.getByText("Flint is thinking…"),
-    undoButton: page.getByRole("button", { name: "Undo" }),
-    redoButton: page.getByRole("button", { name: "Redo" }),
+    // Undo and Redo hide (with their pill) while there's nothing to undo or redo; they're still there, disabled.
+    undoButton: page.getByRole("button", { name: "Undo", includeHidden: true }),
+    redoButton: page.getByRole("button", { name: "Redo", includeHidden: true }),
     /** The line above the message box while Redo has something to reapply. */
     redoWarning: page.getByText("Your next message clears Redo."),
     tryAgainButton: chat.getByRole("button", { name: "Try again" }),

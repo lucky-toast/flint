@@ -17,6 +17,8 @@ type Props = {
   footer?: ReactNode;
   /** Shown over the slip, in the desk's place (e.g. the template code); the slip stays loaded beneath for print and pointing. */
   cover?: ReactNode;
+  /** Controls floating on the desk's top-left corner (Undo and Redo on the working slip). */
+  overlay?: ReactNode;
   /**
    * Pointing at parts (the working slip only). When given, the pane renders the preview-only copy
    * of the template whose tags carry where they are in the source, and hands each loaded slip
@@ -33,7 +35,7 @@ type Props = {
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, cover, pointing, glowOnChange, action, zoom, onZoom }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, cover, overlay, pointing, glowOnChange, action, zoom, onZoom }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets, { instrument: pointing !== undefined });
   const glow = useChangeCount(source);
   return (
@@ -46,6 +48,7 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
         {cover && <div className="slip-pane-cover">{cover}</div>}
+        {overlay}
         {rendered.status === "ok" && (
           <SlipPreview
             title={`${label} slip`}

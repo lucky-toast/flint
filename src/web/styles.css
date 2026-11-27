@@ -523,7 +523,8 @@ body {
   inset: 0;
   z-index: 3;
   overflow: auto;
-  padding: 4px 16px 16px;
+  /* Room at the top for the Undo / Redo pill. */
+  padding: 40px 16px 16px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: #fff;
@@ -800,18 +801,49 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-/* Undo and Redo read as one control. */
-.undo-redo {
+/* Undo and Redo, floating on the working desk's top-left corner (hidden while there's nothing to undo or redo). */
+.desk-history {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 4;
   display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgb(31 27 24 / 0.82);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  animation: saved-in 150ms ease-out;
 }
 
-.editor-toolbar .undo-redo button:first-child {
-  border-radius: 6px 0 0 6px;
+.desk-history[hidden] {
+  display: none;
 }
 
-.editor-toolbar .undo-redo button + button {
-  margin-left: -1px;
-  border-radius: 0 6px 6px 0;
+.desk-history button {
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.desk-history button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.desk-history button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.desk-history-sep {
+  width: 1px;
+  height: 16px;
+  background: rgb(255 255 255 / 0.3);
 }
 
 .saved-note {

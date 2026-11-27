@@ -10,10 +10,14 @@ test("Undo restores the previous working slip and marks the turn undone", async 
   );
   const ed = editor(page);
   await page.goto("/");
+  // Undo and Redo float on the working slip only while there's something to undo or redo.
+  const history = page.getByRole("region", { name: "Working slip" }).getByRole("group", { name: "History", includeHidden: true });
   await expect(ed.undoButton).toBeDisabled();
+  await expect(history).toBeHidden();
 
   await ed.send("Say cheers on the thank-you line (undo)");
   await expect(ed.working.getByText("Cheers for supporting")).toBeVisible();
+  await expect(history).toBeVisible();
 
   await ed.undoButton.click();
 
