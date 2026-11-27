@@ -31,8 +31,9 @@ export function Composer({ disabled, onSend }: Props) {
         onKeyDown={onKeyDown}
       />
       <div className="composer-footer">
+        {/* The count only shows once the limit is near; until then it's just noise. */}
         <span className="composer-count" aria-live="polite">
-          {draft.length}/{MAX_MESSAGE_LENGTH}
+          {draft.length >= MAX_MESSAGE_LENGTH * 0.8 ? `${draft.length}/${MAX_MESSAGE_LENGTH}` : ""}
         </span>
         <button type="submit" disabled={disabled || !draft.trim()}>
           Send

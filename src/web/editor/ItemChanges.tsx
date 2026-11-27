@@ -27,7 +27,7 @@ export function ItemChanges({ original, working, shop, assets }: Props) {
   const extra = extraItemsWarning(changes);
   return (
     <div className="item-changes">
-      <p className="what-changed" data-testid="what-changed">
+      <p className={missing || extra || changes.orders.length ? "what-changed" : "what-changed what-changed-ok"} data-testid="what-changed">
         {whatChanged(changes)}
       </p>
       {missing && (

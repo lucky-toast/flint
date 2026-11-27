@@ -68,6 +68,9 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
   // Clicking the selected part again deselects it; clicking outside every part clears.
   await ed.working.locator(".thank-you").click();
   await expect(ed.selectionChip).toHaveText(/📍 About: Thank you/);
+  // With nothing finer inside it, the name tag says another click clears it.
+  await ed.working.locator(".thank-you").hover();
+  await expect(ed.nameTag).toHaveText("Thank you · click to clear");
   await ed.working.locator(".thank-you").click();
   await expect(ed.selectionChip).toHaveCount(0);
   await ed.working.locator(".order-details").click();

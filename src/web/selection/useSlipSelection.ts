@@ -119,7 +119,10 @@ export function useSlipSelection(source: string): SlipSelectionApi {
       target.setAttribute(HOVER, "");
       const box = target.getBoundingClientRect();
       const view = d.defaultView!;
-      tag.textContent = partName(target);
+      // Clicking the selected part again clears it (nothing finer to drill into there), so the tag says so.
+      const current = selectedRef.current;
+      const isSelected = !!current && target === elementOf(d, current);
+      tag.textContent = isSelected ? `${partName(target)} · click to clear` : partName(target);
       tag.style.left = `${box.left + view.scrollX - 2}px`;
       tag.style.top = `${Math.max(0, box.top + view.scrollY - 26)}px`;
       tag.hidden = false;
