@@ -4,13 +4,20 @@ type Props = {
   onClear: () => void;
 };
 
-/** Above the message box: what the next message is about (its name and an ×), or a tip that the slip can be pointed at. */
-export function SelectionChip({ name, onClear }: Props) {
-  if (!name) return <p className="selection-tip">Tip: click part of the working slip to point at it.</p>;
+/** The tip above the message box while nothing is selected. */
+export function SelectionTip() {
+  return <p className="selection-tip">Tip: click part of the working slip to point at it.</p>;
+}
+
+/**
+ * What the next message is about: a tinted strip joined to the top of the message box, naming the
+ * selected part, with an × to clear it.
+ */
+export function SelectionStrip({ name, onClear }: Required<Props>) {
   return (
-    <div className="selection-chip" role="status" aria-label="Selection">
+    <div className="selection-strip" role="status" aria-label="Selection">
       <span>
-        📍 <strong>{name}</strong>
+        Selected: <strong>{name}</strong>
       </span>
       <button type="button" className="selection-clear" aria-label="Clear selection" onClick={onClear}>
         ×

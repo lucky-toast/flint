@@ -26,7 +26,7 @@ export function editor(page: Page) {
     /** The line above the message box while Redo has something to reapply. */
     redoWarning: page.getByText("Your next message clears Redo."),
     tryAgainButton: chat.getByRole("button", { name: "Try again" }),
-    /** The chip above the message box naming what's selected on the working slip ("📍 …"). */
+    /** The strip on top of the message box naming what's selected on the working slip ("Selected: …"). */
     selectionChip: page.getByRole("status", { name: "Selection" }),
     clearSelectionButton: page.getByRole("button", { name: "Clear selection" }),
     /** The tip above the message box while nothing is selected. */

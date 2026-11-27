@@ -3,7 +3,7 @@ import type { Shop, Template } from "../../core";
 import { uploadFollowUp } from "../assets/asset-store";
 import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
-import { SelectionChip } from "../chat/SelectionChip";
+import { SelectionTip } from "../chat/SelectionChip";
 import { useSlipSelection } from "../selection/useSlipSelection";
 import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
@@ -148,12 +148,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         onUpload={upload}
         redoPending={session.state.redo.length > 0}
         replayChips={replayChips}
-        selectionChip={
-          <SelectionChip
-            name={slipSelection.selection?.name}
-            onClear={slipSelection.clear}
-          />
-        }
+        selectionChip={slipSelection.selection ? undefined : <SelectionTip />}
+        selection={slipSelection.selection && { name: slipSelection.selection.name, onClear: slipSelection.clear }}
       />
     </div>
   );

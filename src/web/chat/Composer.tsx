@@ -1,10 +1,16 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { MAX_MESSAGE_LENGTH } from "../../core";
+import { SelectionStrip } from "./SelectionChip";
 
-type Props = { disabled: boolean; onSend: (message: string) => void };
+type Props = {
+  disabled: boolean;
+  onSend: (message: string) => void;
+  /** What's selected on the working slip: shown as a strip on top of the box. */
+  selection?: { name: string; onClear: () => void };
+};
 
 /** The message box. Refuses more than MAX_MESSAGE_LENGTH characters, however they arrive. */
-export function Composer({ disabled, onSend }: Props) {
+export function Composer({ disabled, onSend, selection }: Props) {
   const [draft, setDraft] = useState("");
 
   const submit = (e?: FormEvent) => {
@@ -20,10 +26,11 @@ export function Composer({ disabled, onSend }: Props) {
   };
 
   return (
-    <form className="composer" onSubmit={submit}>
+    <form className={selection ? "composer composer-selected" : "composer"} onSubmit={submit}>
+      {selection && <SelectionStrip name={selection.name} onClear={selection.onClear} />}
       <textarea
         aria-label="Message Flint"
-        placeholder="Tell Flint what to change…"
+        placeholder={selection ? `Tell Flint what to change about ${selection.name}…` : "Tell Flint what to change…"}
         value={draft}
         maxLength={MAX_MESSAGE_LENGTH}
         rows={3}
