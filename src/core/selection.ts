@@ -1,93 +1,124 @@
 // Pointing at the working slip: the preview-only instrumented template, and what Flint is told
 // about a selection. Flint sees only the template (never the example orders or line numbers) and
-// edits by exact find/replace, so a selection is described by the part's name and its template
-// code, quoted verbatim and made unique the way an edit's `find` must be.
+// edits by exact find/replace, so a selection is described by the part's name and the clicked
+// element's opening tag, copied from the template (Liquid included), plus which occurrence of that
+// tag it is when the tag isn't unique. Nothing read from the rendered slip goes in.
 
 import { countOccurrences } from "./edits";
 
-/** The longest selection note the Worker passes on; a longer one is trimmed. */
-export const MAX_SELECTION_LENGTH = 2000;
+/** The longest selection note: the app builds one that fits, and the Worker trims a longer one. */
+export const MAX_SELECTION_LENGTH = 200;
 
 /** The attribute that carries each opening tag's 1-based source line in the instrumented preview. */
 export const LINE_ATTRIBUTE = "data-flint-line";
 
-/**
- * A preview-only copy of the template in which every opening tag carries its 1-based source line.
- * Never saved, downloaded or sent to Flint.
- */
-export function instrumentSource(source: string): string {
-  return source
-    .split("\n")
-    .map((line, i) =>
-      // Odd pieces are the Liquid markup on this line, left as it is.
-      line
-        .split(LIQUID_MARKUP)
-        .map((piece, j) => (j % 2 ? piece : piece.replace(/<([a-zA-Z][a-zA-Z0-9]*)(?=[\s>/])/g, `<$1 ${LINE_ATTRIBUTE}="${i + 1}"`)))
-        .join(""),
-    )
-    .join("\n");
-}
+/** The attribute that carries each opening tag's 0-based position among the opening tags on its line. */
+export const POSITION_ATTRIBUTE = "data-flint-position";
 
 /** Liquid output and tags on one line, `{{ … }}` and `{% … %}`, captured so a split keeps them. */
 const LIQUID_MARKUP = /(\{\{.*?\}\}|\{%.*?%\})/;
 
+/** An opening tag's `<` and name, followed by whitespace, `>` or `/`. */
+const OPENING_TAG = /<[a-zA-Z][a-zA-Z0-9]*(?=[\s>/])/g;
+
+/** The opening tags on one line, outside its Liquid markup, in order: where each starts and its `<name`. */
+function openingTags(line: string): { at: number; head: string }[] {
+  const tags: { at: number; head: string }[] = [];
+  let offset = 0;
+  // Odd pieces are the Liquid markup on this line, skipped.
+  line.split(LIQUID_MARKUP).forEach((piece, j) => {
+    if (j % 2 === 0) for (const m of piece.matchAll(OPENING_TAG)) tags.push({ at: offset + m.index, head: m[0] });
+    offset += piece.length;
+  });
+  return tags;
+}
+
 /**
- * The shortest run of lines from `line` (1-based) whose text occurs once in the template, if one
- * fits in `max` characters: the same uniqueness an edit's `find` needs.
+ * A preview-only copy of the template in which every opening tag carries its 1-based source line
+ * and its position among the line's opening tags. Never saved, downloaded or sent to Flint.
  */
-export function uniqueQuote(source: string, line: number, max = MAX_SELECTION_LENGTH): string | undefined {
+export function instrumentSource(source: string): string {
+  return source
+    .split("\n")
+    .map((line, i) => {
+      let out = line;
+      const tags = openingTags(line);
+      // From the last tag back, so the earlier offsets still hold.
+      for (let position = tags.length - 1; position >= 0; position--) {
+        const end = tags[position]!.at + tags[position]!.head.length;
+        out = `${out.slice(0, end)} ${LINE_ATTRIBUTE}="${i + 1}" ${POSITION_ATTRIBUTE}="${position}"${out.slice(end)}`;
+      }
+      return out;
+    })
+    .join("\n");
+}
+
+/**
+ * Where the opening tag at `position` on `line` (1-based) starts and ends in `source`: up to its
+ * closing `>`, past quoted attribute values and Liquid markup, across lines if need be.
+ */
+function openingTagAt(source: string, line: number, position: number): { start: number; end: number } | undefined {
   const lines = source.split("\n");
-  const start = line - 1;
-  for (let end = start; end < lines.length; end++) {
-    const quote = lines.slice(start, end + 1).join("\n");
-    if (quote.length > max) return undefined;
-    if (countOccurrences(source, quote) === 1) return quote;
+  const text = lines[line - 1];
+  const tag = text === undefined ? undefined : openingTags(text)[position];
+  if (!tag) return undefined;
+  const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0) + tag.at;
+  let quote: string | null = null;
+  for (let at = start + tag.head.length; at < source.length; at++) {
+    const c = source[at]!;
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === "{" && (source[at + 1] === "{" || source[at + 1] === "%")) {
+      const close = source.indexOf(source[at + 1] === "{" ? "}}" : "%}", at + 2);
+      if (close === -1) break;
+      at = close + 1;
+    } else if (c === ">") {
+      return { start, end: at + 1 };
+    }
   }
-  return undefined;
+  return { start, end: source.length };
 }
 
 export type SelectedPart = {
   /** The template the selection was made on. */
   source: string;
-  /** The part's 1-based source line (where its opening tag is). */
+  /** The 1-based source line of the part's opening tag. */
   line: number;
+  /** The 0-based position of the part's opening tag among the opening tags on that line. */
+  position: number;
   /** What the seller sees on the chip, e.g. "SKU column". */
   name: string;
-  /** Whether that line renders more than one element on the slip (say, a column in every item row). */
-  repeats?: boolean;
 };
 
-/** The line Flint is told about a selection: its name and its template code, quoted so it occurs once. */
-export function selectionNote({ source, line, name, repeats }: SelectedPart): string {
-  const lines = source.split("\n");
-  const intro = `The seller selected the "${name.slice(0, 80)}" part of the slip. In the template it is:`;
-  const repeat = repeats ? "\nThe template repeats it, so it appears more than once on the slip." : "";
-  const fence = (code: string) => `${intro}\n\`\`\`liquid\n${code}\n\`\`\`${repeat}`;
-  const budget = MAX_SELECTION_LENGTH - fence("").length;
-
-  const quote = uniqueQuote(source, line, budget);
-  if (quote !== undefined) return fence(quote);
-
-  // No unique run of lines fits: quote the line and say which of its occurrences the seller means.
-  // The counts are of the quote actually sent, so room is kept for them at their widest.
-  const where = (total: number, which: number) =>
-    `\nThat code occurs ${total} times in the template; the seller means occurrence ${which}, counting from the top.`;
-  const widest = Number("9".repeat(String(source.length).length));
-  const sent = (lines[line - 1] ?? "").slice(0, budget - where(widest, widest).length);
-  const start = lines.slice(0, line - 1).join("\n").length + (line > 1 ? 1 : 0);
-  const which = countOccurrences(source.slice(0, start + sent.length), sent);
-  return `${fence(sent)}${where(countOccurrences(source, sent), which)}`;
-}
+/** The longest part name a note quotes. */
+const MAX_NAME_LENGTH = 40;
 
 /**
- * The 1-based line of the occurrence of `quote` in `source` that starts closest to `line`, or
- * undefined when `quote` isn't there: where a selection's code went after Undo or Redo.
+ * What Flint is told about a selection, at most MAX_SELECTION_LENGTH characters: the part's name
+ * and its opening tag copied from the template, plus which occurrence of that tag it is when the
+ * template has it more than once. A tag too long to fit is trimmed, and the occurrence is counted
+ * on the trimmed text, so it stays accurate for what's sent.
  */
-export function quoteLineNear(source: string, quote: string, line: number): number | undefined {
-  let best: number | undefined;
-  for (let at = source.indexOf(quote); at !== -1; at = source.indexOf(quote, at + 1)) {
-    const found = source.slice(0, at).split("\n").length;
-    if (best === undefined || Math.abs(found - line) < Math.abs(best - line)) best = found;
+export function selectionNote({ source, line, position, name }: SelectedPart): string {
+  const intro = `The seller selected the "${name.slice(0, MAX_NAME_LENGTH)}" part.`;
+  const tag = openingTagAt(source, line, position);
+  if (!tag) return intro;
+
+  const note = (quote: string, trimmed: boolean) => {
+    const total = countOccurrences(source, quote);
+    const which = countOccurrences(source.slice(0, tag.start + quote.length), quote);
+    const occurrence = total > 1 ? `, occurrence ${which} of ${total} counting from the top` : "";
+    return `${intro} In the template it's the opening tag ${trimmed ? "that starts " : ""}\`${quote}\`${occurrence}.`;
+  };
+
+  let quote = source.slice(tag.start, tag.end);
+  let text = note(quote, false);
+  // Trim until it fits. A shorter quote can occur more often, so its counts are taken again each time.
+  while (text.length > MAX_SELECTION_LENGTH && quote.length > 1) {
+    quote = quote.slice(0, Math.max(1, quote.length - (text.length - MAX_SELECTION_LENGTH)));
+    text = note(quote, true);
   }
-  return best;
+  return text.slice(0, MAX_SELECTION_LENGTH);
 }

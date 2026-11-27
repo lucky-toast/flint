@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { quoteLineNear, selectionNote, uniqueQuote, type SelectedPart } from "../../core";
+import { selectionNote, type SelectedPart } from "../../core";
 import type { TurnSelection } from "../session/session";
-import { partAbove, partInside, partLine, partName, partsInside, renderedFrom, sameCode, sections, slipRoot, UI_ATTRIBUTE } from "./parts";
+import { partAbove, partInside, partName, partPlace, partsInside, renderedFrom, sections, slipRoot, UI_ATTRIBUTE } from "./parts";
 
 // Pointing at the working slip. The working slip renders an instrumented copy of the template
-// (every opening tag carries its source line), and this hook listens to its same-origin preview
+// (every opening tag carries its source line and its position on that line), and this hook listens to its same-origin preview
 // document from the app, the way link-blocking does: the slip's sandbox and CSP are unchanged, so
 // nothing runs inside it. Hover boxes, the name tag and the selected outline are styles and one
 // element injected into the preview document only, for the screen, never for print.
 
 /**
- * The selection, by where it comes from in the template (its source is moved along on Undo and
- * Redo): its tag, and which of the elements rendered from its line with that tag it is.
+ * The selection, by where it comes from in the template (its opening tag's line and position), and
+ * which of the elements rendered from that tag it is, for the outline when the template repeats it.
  */
-type SelectedPartRef = SelectedPart & { tag: string; index: number };
+type SelectedPartRef = SelectedPart & { index: number };
 
 const PICKABLE = "data-flint-pickable";
 const HOVER = "data-flint-hover";
@@ -33,16 +33,8 @@ const FRAME_STYLE = `
 `;
 
 function elementOf(doc: Document, selectedPart: SelectedPartRef): Element | null {
-  const all = renderedFrom(doc, selectedPart.line, selectedPart.tag);
+  const all = renderedFrom(doc, selectedPart.line, selectedPart.position);
   return all[selectedPart.index] ?? all[0] ?? null;
-}
-
-/** The selection's place in a new template, if its code is still there: the look-alike nearest its old line. */
-function moved(selectedPart: SelectedPartRef, source: string): SelectedPartRef | null {
-  if (selectedPart.source === source) return selectedPart;
-  const quote = uniqueQuote(selectedPart.source, selectedPart.line) ?? selectedPart.source.split("\n")[selectedPart.line - 1] ?? "";
-  const line = quote ? quoteLineNear(source, quote, selectedPart.line) : undefined;
-  return line === undefined ? null : { ...selectedPart, source, line };
 }
 
 function clearMark(doc: Document, attr: string) {
@@ -71,23 +63,22 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   /** The element under the cursor, so the hover box can follow a click without a mouse move. */
   const under = useRef<Element | null>(null);
 
-  // Undo, Redo and the like change the template without clearing the selection: follow its code.
+  // A new template (an accepted edit, Undo, Redo, Try again) re-renders the slip: the selection
+  // clears rather than point at code that has changed. It stays in the history Flint sees.
   useEffect(() => {
-    setSelectedPart((current) => (current ? moved(current, source) : current));
+    setSelectedPart((current) => (current && current.source !== source ? null : current));
   }, [source]);
 
   const clear = useCallback(() => setSelectedPart(null), []);
 
   const selectPart = useCallback((el: Element) => {
-    const line = partLine(el);
-    if (!line) return;
+    const place = partPlace(el);
+    if (!place) return;
     setSelectedPart({
       source: sourceRef.current,
-      line,
-      tag: el.tagName,
-      index: renderedFrom(el.ownerDocument, line, el.tagName).indexOf(el),
+      ...place,
+      index: renderedFrom(el.ownerDocument, place.line, place.position).indexOf(el),
       name: partName(el),
-      repeats: sameCode(el).length > 1,
     });
   }, []);
 

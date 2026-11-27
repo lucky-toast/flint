@@ -39,8 +39,6 @@ export type SessionApi = {
 export type SessionOptions = {
   /** The names of the seller's uploaded images, read at send time so a just-uploaded one is included. */
   uploadedAssetNames?: () => string[];
-  /** Told when one of Flint's edits lands on the working slip (not on Undo, Redo or a restored retry). */
-  onEdited?: () => void;
 };
 
 /** The editor session for one shop + template, wired to the Worker. */
@@ -51,8 +49,6 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
   latest.current = state;
   const uploadedAssetNames = useRef(options.uploadedAssetNames);
   uploadedAssetNames.current = options.uploadedAssetNames;
-  const onEdited = useRef(options.onEdited);
-  onEdited.current = options.onEdited;
 
   // Applies an action now, so a double click can't act twice before React re-renders.
   const apply = useCallback((action: SessionAction) => {
@@ -73,10 +69,7 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
         ...(selection ? { selection: selection.note } : {}),
         uploadedAssets: uploadedAssetNames.current?.() ?? [],
       };
-      void postTurn(request).then((result) => {
-        apply({ type: "replied", turnId, result });
-        if (result.type === "edit") onEdited.current?.();
-      });
+      void postTurn(request).then((result) => apply({ type: "replied", turnId, result }));
     },
     [shop.id, apply],
   );

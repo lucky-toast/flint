@@ -31,11 +31,8 @@ type Props = {
  */
 export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }: Props) {
   const uploads = useUploadedAssets(shop);
-  // An accepted edit re-renders the working slip, so the selection clears (it's in the history).
-  const session = useSession(shop, template, {
-    uploadedAssetNames: uploads.uploadedNames,
-    onEdited: () => slipSelection.clear(),
-  });
+  const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
+  // Clears itself whenever the working slip's template changes (an edit, Undo, Redo, Try again).
   const slipSelection = useSlipSelection(workingSource(session.state));
   /** Every message goes with what the seller pointed at; a question back from Flint keeps it. */
   const send = (message: string) => session.send(message, slipSelection.selection);

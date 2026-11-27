@@ -1,4 +1,4 @@
-import { LINE_ATTRIBUTE } from "../../core";
+import { LINE_ATTRIBUTE, POSITION_ATTRIBUTE } from "../../core";
 
 // Finding parts in the working slip's preview document. A part is an element with a class; a
 // section is a part directly inside the slip's root. Unnamed elements (like table rows) are never
@@ -63,23 +63,15 @@ export function partName(el: Element): string {
   return el.tagName === "TD" || el.tagName === "TH" ? `${capitalized} column` : capitalized;
 }
 
-/** The part's 1-based template line, from the instrumented preview. */
-export function partLine(el: Element): number | undefined {
+/** Where a part's opening tag is in the template, from the instrumented preview. */
+export function partPlace(el: Element): { line: number; position: number } | undefined {
+  if (!el.hasAttribute(POSITION_ATTRIBUTE)) return undefined;
   const line = Number(el.getAttribute(LINE_ATTRIBUTE));
-  return Number.isInteger(line) && line > 0 ? line : undefined;
+  const position = Number(el.getAttribute(POSITION_ATTRIBUTE));
+  return Number.isInteger(line) && line > 0 && Number.isInteger(position) && position >= 0 ? { line, position } : undefined;
 }
 
-/** The elements rendered from template line `line` with tag name `tag`, in document order. */
-export function renderedFrom(doc: Document, line: number, tag: string): Element[] {
-  return [...doc.querySelectorAll(`[${LINE_ATTRIBUTE}="${line}"]`)].filter((e) => e.tagName === tag);
-}
-
-/**
- * The elements rendered from the same template code as `el` (its line, tag and class), in
- * document order: more than one when the template repeats it.
- */
-export function sameCode(el: Element): Element[] {
-  const line = partLine(el);
-  if (!line) return [el];
-  return renderedFrom(el.ownerDocument, line, el.tagName).filter((e) => e.getAttribute("class") === el.getAttribute("class"));
+/** The elements rendered from the opening tag at `position` on template line `line`, in document order. */
+export function renderedFrom(doc: Document, line: number, position: number): Element[] {
+  return [...doc.querySelectorAll(`[${LINE_ATTRIBUTE}="${line}"][${POSITION_ATTRIBUTE}="${position}"]`)];
 }
