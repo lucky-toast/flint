@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Shop, Template } from "../../core";
 import { liquidFileName } from "../templates/saved-templates";
 import { SaveDialog } from "../templates/SaveDialog";
@@ -34,8 +34,20 @@ function printWorkingSlip() {
 /** Save, download and print for the working slip. */
 export function SlipActions({ shop, template, source, disabled, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
+  // A short "Saved" confirmation by the button, gone after a few seconds.
+  const [savedAs, setSavedAs] = useState<string>();
+  useEffect(() => {
+    if (!savedAs) return;
+    const timer = setTimeout(() => setSavedAs(undefined), 3000);
+    return () => clearTimeout(timer);
+  }, [savedAs]);
   return (
     <div className="slip-actions">
+      {savedAs && (
+        <span className="saved-note" role="status">
+          ✓ Saved as “{savedAs}”
+        </span>
+      )}
       <button type="button" onClick={() => setSaving(true)} disabled={disabled}>
         Save…
       </button>
@@ -53,6 +65,7 @@ export function SlipActions({ shop, template, source, disabled, onSaved }: Props
           onCancel={() => setSaving(false)}
           onSaved={(saved) => {
             setSaving(false);
+            setSavedAs(saved.name);
             onSaved(saved);
           }}
         />
