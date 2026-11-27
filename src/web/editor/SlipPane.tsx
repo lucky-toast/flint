@@ -16,20 +16,21 @@ type Props = {
   /** Content under the slip, e.g. the show-code toggle. */
   footer?: ReactNode;
   /**
-   * For pointing at parts: render a preview-only copy of the template whose tags carry their
-   * source lines, and hand each loaded slip document to this callback.
+   * Pointing at parts (the working slip only). When given, the pane renders the preview-only copy
+   * of the template whose tags carry where they are in the source, and hands each loaded slip
+   * document to `onDocument`. Without it, the slip renders as it is and nothing listens to it.
    */
-  onDocument?: (doc: Document) => void;
+  pointing?: { onDocument: (doc: Document) => void };
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument }: Props) {
-  const rendered = useRenderedSlip(source, shop, order, assets, { instrument: !!onDocument });
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, pointing }: Props) {
+  const rendered = useRenderedSlip(source, shop, order, assets, { instrument: pointing !== undefined });
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
       <h2>{label}</h2>
       {children}
-      {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} />}
+      {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={pointing?.onDocument} />}
       {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
       {rendered.status === "error" && (
         <p className="slip-status" role="alert">

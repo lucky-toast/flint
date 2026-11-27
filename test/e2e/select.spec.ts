@@ -40,6 +40,8 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
   await expect(ed.selectionChip).toHaveText(/📍 About: Items/);
   await expect(ed.selectionTip).toHaveCount(0);
   await expect.poll(() => outline(items(ed.working))).toBe("solid");
+  // In the app's --selection colour, which the slip's own document doesn't have.
+  await expect.poll(() => items(ed.working).evaluate((el) => getComputedStyle(el).outlineColor)).toBe("rgb(232, 89, 12)");
   // Inside the selection, the boxes go one part finer.
   await skuCell(ed.working).hover();
   await expect(ed.nameTag).toHaveText("SKU column");

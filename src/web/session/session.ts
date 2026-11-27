@@ -57,7 +57,7 @@ export type SessionAction =
   | { type: "saved" };
 
 /** A turn as the seller sent it, without Flint's outcome. */
-function sent({ id, message, selection }: Turn): Turn {
+function asSent({ id, message, selection }: Pick<Turn, "id" | "message" | "selection">): Turn {
   return selection ? { id, message, selection } : { id, message };
 }
 
@@ -68,11 +68,7 @@ export function createSession(source: string): Session {
 export function sessionReducer(state: Session, action: SessionAction): Session {
   switch (action.type) {
     case "sent": {
-      const turn: Turn = {
-        id: state.nextTurnId,
-        message: action.message,
-        ...(action.selection ? { selection: action.selection } : {}),
-      };
+      const turn = asSent({ id: state.nextTurnId, message: action.message, selection: action.selection });
       // Any message clears Redo: the turns on the stack stay undone for good.
       return { ...state, turns: [...state.turns, turn], nextTurnId: state.nextTurnId + 1, redo: [] };
     }
@@ -81,11 +77,11 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       const retried = state.turns.find((t) => t.id === turnId)?.retrying;
       if (retried && result.type === "error") {
         const turns = state.turns.map((t) =>
-          t.id === turnId ? { ...sent(t), result: retried.result, note: result.error } : t,
+          t.id === turnId ? { ...asSent(t), result: retried.result, note: result.error } : t,
         );
         return { ...state, turns, versions: [...state.versions, retried.version] };
       }
-      const turns = state.turns.map((t) => (t.id === turnId ? { ...sent(t), result } : t));
+      const turns = state.turns.map((t) => (t.id === turnId ? { ...asSent(t), result } : t));
       const versions =
         result.type === "edit" ? [...state.versions, { source: result.templateSource, turnId }] : state.versions;
       return { ...state, turns, versions };
@@ -110,7 +106,7 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       const turn = retryableTurn(state);
       if (pendingTurn(state) || turn?.id !== action.turnId) return state;
       const retrying = { result: turn.result, version: state.versions[state.versions.length - 1]! };
-      const turns = state.turns.map((t) => (t.id === action.turnId ? { ...sent(t), retrying } : t));
+      const turns = state.turns.map((t) => (t.id === action.turnId ? { ...asSent(t), retrying } : t));
       return { ...state, turns, versions: state.versions.slice(0, -1) };
     }
     case "saved":

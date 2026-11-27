@@ -77,7 +77,10 @@ export type TurnInput = {
   retryHint?: string;
   /** Names of images the seller uploaded for this shop (the images never leave the browser). */
   uploadedAssets?: string[];
-  /** What the seller pointed at on the working slip (see selectionNote in selection.ts). */
+  /**
+   * The selection note, what Flint is told the seller pointed at (selectionNote in selection.ts).
+   * It keeps the name `selection` because that's the API field (#20); the client holds it as TurnSelection.note.
+   */
   selection?: string;
 };
 

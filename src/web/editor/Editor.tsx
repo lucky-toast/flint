@@ -92,7 +92,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           order={order}
           paper={template.paper}
           assets={uploads.assets}
-          onDocument={slipSelection.onDocument}
+          pointing={{ onDocument: slipSelection.onDocument }}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />

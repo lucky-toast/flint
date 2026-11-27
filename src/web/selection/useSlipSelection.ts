@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { selectionNote, type SelectedPart } from "../../core";
 import type { TurnSelection } from "../session/session";
-import { partAbove, partInside, partName, partPlace, partsInside, renderedFrom, sections, slipRoot, UI_ATTRIBUTE } from "./parts";
+import { partAbove, partInside, partName, partPlace, partsInside, renderedFrom, slipRoot, UI_ATTRIBUTE } from "./parts";
 
 // Pointing at the working slip. The working slip renders an instrumented copy of the template
 // (every opening tag carries its source line and its position on that line), and this hook listens to its same-origin preview
@@ -20,13 +20,18 @@ const HOVER = "data-flint-hover";
 const SELECTED = "data-flint-selected";
 const POINTING = "data-flint-pointing";
 
-const ACCENT = "#e8590c";
-const FRAME_STYLE = `
+/**
+ * The styles injected into the slip. Their colour is the app's --selection token (styles.css), read
+ * from the app's document and passed in, since the slip is a document of its own.
+ */
+const frameStyle = (accent: string) => `
 @media screen {
-  body[${POINTING}] [${PICKABLE}] { outline: 1px dashed rgb(232 89 12 / 0.45); outline-offset: 2px; }
-  [${HOVER}] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
-  [${SELECTED}] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.07) !important; }
-  [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: ${ACCENT}; color: #fff;
+  :root { --flint-selection: ${accent}; }
+  body[${POINTING}] [${PICKABLE}] { outline: 1px dashed color-mix(in srgb, var(--flint-selection) 45%, transparent); outline-offset: 2px; }
+  [${HOVER}] { outline: 2px dashed var(--flint-selection) !important; outline-offset: 2px; cursor: pointer; }
+  [${SELECTED}] { outline: 2px solid var(--flint-selection) !important; outline-offset: 2px;
+    background-color: color-mix(in srgb, var(--flint-selection) 7%, transparent) !important; }
+  [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: var(--flint-selection); color: #fff;
     font: 600 15px/1 system-ui, sans-serif; padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 }
 @media print { [${UI_ATTRIBUTE}] { display: none !important; } }
@@ -118,7 +123,7 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   const onDocument = useCallback(
     (d: Document) => {
       const style = d.createElement("style");
-      style.textContent = FRAME_STYLE;
+      style.textContent = frameStyle(getComputedStyle(document.documentElement).getPropertyValue("--selection").trim());
       // In the body, after the slip, so the head keeps only the page setup.
       d.body.appendChild(style);
       const tag = d.createElement("div");
@@ -162,7 +167,8 @@ export function useSlipSelection(source: string): SlipSelectionApi {
     clearMark(doc, SELECTED);
     clearMark(doc, PICKABLE);
     selected?.setAttribute(SELECTED, "");
-    const pickable = root ? [...sections(root), ...(selected ? partsInside(selected) : [])] : [];
+    // The parts inside the root are the sections.
+    const pickable = root ? [...partsInside(root), ...(selected ? partsInside(selected) : [])] : [];
     for (const el of pickable) el.setAttribute(PICKABLE, "");
     showHover(doc);
   }, [doc, selected, root, showHover]);

@@ -40,12 +40,7 @@ export function partAbove(el: Element, root: Element): Element | null {
   return null;
 }
 
-/** The sections: the outermost parts inside the root (normally the root's direct children). */
-export function sections(root: Element): Element[] {
-  return partsInside(root);
-}
-
-/** The parts exactly one level inside `outer`. */
+/** The parts exactly one level inside `outer`. Inside the slip's root, these are its sections. */
 export function partsInside(outer: Element): Element[] {
   return [...outer.querySelectorAll("[class]")].filter((el) => partInside(el, outer) === el);
 }
