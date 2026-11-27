@@ -59,8 +59,6 @@ function clearMark(doc: Document, attr: string) {
 export type SlipSelectionApi = {
   /** What's selected, as it goes with the next message. */
   selection: TurnSelection | undefined;
-  /** How many times the selected part shows on this slip (every row's cell, say); 0 when nothing is selected. */
-  copies: number;
   /** Whether Select bigger has a part to go to. */
   canSelectBigger: boolean;
   selectBigger: () => void;
@@ -200,6 +198,5 @@ export function useSlipSelection(source: string): SlipSelectionApi {
     [selectedPart],
   );
 
-  const copies = selected ? copiesOf(selected).length : 0;
-  return { selection, copies, canSelectBigger: !!bigger, selectBigger, clear, onDocument };
+  return { selection, canSelectBigger: !!bigger, selectBigger, clear, onDocument };
 }

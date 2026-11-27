@@ -1122,22 +1122,11 @@ summary:focus-visible {
   font-size: 13px;
 }
 
-.selection-copies {
-  color: #b5622f;
-}
-
 .selection-chip button {
   border: none;
   background: transparent;
   color: inherit;
   cursor: pointer;
-}
-
-.selection-chip .selection-bigger {
-  border: 1px solid var(--selection);
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 11px;
 }
 
 .selection-chip .selection-clear {

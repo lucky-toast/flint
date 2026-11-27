@@ -151,9 +151,6 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         selectionChip={
           <SelectionChip
             name={slipSelection.selection?.name}
-            copies={slipSelection.copies}
-            canSelectBigger={slipSelection.canSelectBigger}
-            onSelectBigger={slipSelection.selectBigger}
             onClear={slipSelection.clear}
           />
         }
