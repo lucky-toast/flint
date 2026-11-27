@@ -113,8 +113,9 @@ type Order = {
   buyer: string;
   isGift: boolean; giftMessage: string;  // "" when absent
   shippingAddress: { name; line1; line2; city; region; postalCode; country };
-  subtotal: number; shipping: number; total: number; currency: string;
-  subtotalFormatted: string; shippingFormatted: string; totalFormatted: string;
+  subtotal: number; shipping: number; discount: number; tax: number; total: number; currency: string;
+  subtotalFormatted: string; shippingFormatted: string; discountFormatted: string;
+  taxFormatted: string; totalFormatted: string;   // discount and tax are 0 when absent
   lineItems: LineItem[];
 };
 type LineItem = {
@@ -128,9 +129,25 @@ type Template = { id: string; name: string; builtIn: boolean; paper: "letter" | 
 ```
 - `options` replaces the earlier `category` idea. It mirrors the name/value variations Etsy and eBay send. Every item in a shop has the same option keys, because strict variables would otherwise throw when grouping.
 - Optional text fields are present as `""`, never missing, so strict variables never throws on them. Templates guard them with `if`.
-- Render context: `{ shop: { name, platform }, assets, order }`.
+- Order-level `tax` comes from the marketplaces, so every built-in template shows it in the totals. `discount` is there so the totals add up: `total = subtotal + shipping - discount + tax`. Both are always present, as 0 when absent.
+- Render context: `{ shop: { name, platform }, assets, order }`. A template renders one order; a host that prints several renders it once per order.
 - Orders per shop: typical · gift with message · over $200 · large mixed (3+ distinct option values, quantity ties) · single item · awkward (long names, empty optional fields, international).
 - Assets: each shop ships `logo` plus one or two extras. Uploads become data URLs in `localStorage`, keyed per shop (about 200 KB cap each). Templates reference images only as `assets.<name>`.
+
+### Running inside the seller's app
+See `docs/adr/0001-embed-flint-in-the-sellers-app.md`. This is for the demo video only, and the app's side is built in the app's rewrite, not here. This repository only defines the contract and Flint's embedded mode.
+- The app opens the deployed Flint in an Electron view. Its preload script exposes `window.flintHost`. When the bridge is present, Flint runs in **embedded mode**; without it, Flint behaves exactly as it does on the web.
+- The bridge contract, defined as a TypeScript type in this repository for the app to implement:
+  - `open()` returns `{ template: { name, paper, source }, shop: Shop, accessCode }`.
+  - `save({ mode: "overwrite" | "new", name, paper, source })` resolves once the app has written the file.
+  - `onCloseRequested(handler)` is how the app's Back button asks to close, and `close()` is how Flint tells the app it can close.
+- Embedded mode opens straight into the editor on the app's template and the app's shop. There is no shop switcher and no template picker. The example-order switcher stays, using the shop's mock orders.
+- The access code comes from `open()`, so nothing is typed. The app keeps it in a local setting that is never committed.
+- The save dialog looks the same. Overwrite replaces the template the app opened, and Save as new adds a template to the app. Saving goes only to the app, not to Flint's browser library. The original then resets to the saved version, as it does on the web.
+- When the app's Back button asks to close, Flint runs its usual unsaved-changes prompt and calls `close()` once the seller agrees. Closing the window falls back to the browser's leave-page prompt.
+- The shop is mock data in Flint's shape: name, platform, assets and sample orders. Real orders are never sent, because that would break the privacy policy. Later, sample orders could be generated from the seller's active listings.
+- Turns carry the sent shop instead of a demo shop id. The Worker checks it against the schema, caps its size, and needs only the asset names, not the images.
+- If Flint can't load, the app shows its own "you're offline" page.
 
 ### Liquid environment
 - LiquidJS, all built-in tags and filters allowed, no custom filters, `strictFilters` and `strictVariables` on. The same environment runs in the browser and the Worker.
@@ -195,7 +212,7 @@ When Ember calls `request_asset`, the seller uploads an image and gives it a nam
 Slips render in a sandboxed iframe with scripts disabled, under a content security policy that allows only the document's own content and data URIs: no scripts, no network connections, no objects or frames, no form submissions, no base URI. Template content can be any HTML, CSS and Liquid. The policy blocks the remaining risks: scripts running on the app's domain, and remote image or CSS URLs that could carry order data elsewhere. No extra validation rule is needed. Printing works from the iframe.
 
 ### Worker API
-- `POST /api/turn` takes `{shopId, templateSource, history, message, retryHint?}` and returns one of `edit` (new template plus summary), `ask` (question plus options), `asset` (description), `reply` (message) or `error` (`too_big` | `invalid` | `resting`). The access code comes in a request header.
+- `POST /api/turn` takes `{shopId | shop, templateSource, history, message, retryHint?}`, where `shop` is a shop sent by a host app (see "Running inside the seller's app") and returns one of `edit` (new template plus summary), `ask` (question plus options), `asset` (description), `reply` (message) or `error` (`too_big` | `invalid` | `resting`). The access code comes in a request header.
 - `GET /api/status` returns `{live, budgetRemainingPct}`.
 - Bindings and config: the budget Durable Object, a rate-limit binding, secrets for the model API key and access code, a token-budget variable and a live-mode kill switch. Locally, secrets live in an ignored dev-vars file. Only an example env file is committed.
 
@@ -239,7 +256,9 @@ Cheerful and brief, one-line confirmations, light emoji, never talks code to the
 9. Undo once, Save as new, Print.
 10. Close: every edit is checked against every example order, and it's Liquid, so it drops into the production app.
 
-The demo shows only what was built during the hackathon.
+11. Inside the seller's app (about 20 s): "Design with Flint" opens Flint on the app's template, a quick edit, Save, and the app's template file has changed.
+
+The demo shows only what was built during the hackathon. The seller's app appears only as the host in step 11, labelled on screen as pre-existing, apart from its new menu item and bridge.
 
 ## Testing Decisions
 
@@ -283,6 +302,8 @@ The demo shows only what was built during the hackathon.
 - A mobile layout (desktop only).
 - Template settings toggles (Flint edits the template directly instead, e.g. to hide prices).
 - Porting `core` into the Electron app during the hackathon, and any code from that app or its port.
+- Building the app's side of the embedded hook (menu item, view, preload bridge, offline page). That lands in the app's rewrite.
+- Sample orders generated from a seller's live listings.
 
 **Stretch goals, only if Nov 28 ends early:** image input, where the seller uploads a photo of a slip they like and says "make mine look like this" (Ember reads images natively) · Flint suggesting template names · per-item rules ("for mugs, add care instructions") · keyboard shortcuts.
 
