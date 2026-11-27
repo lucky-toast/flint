@@ -325,7 +325,7 @@ Flint: ${"f".repeat(1000)}`);
 
   it("sends the seller's selection right after the request, after the template", async () => {
     const calls = fakeEmber(sortEdit());
-    const selection = 'The seller selected the "SKU column" part of the slip.';
+    const selection = 'Selected "SKU column", the element opening with `<td class="col-sku">` in the template.';
 
     await turnJson({ message: "Make this bold", selection });
 
@@ -370,7 +370,7 @@ ${"s".repeat(MAX_SELECTION_LENGTH)}`);
   it("keeps each history turn's selection beside that turn, trimmed", async () => {
     const calls = fakeEmber(sortEdit());
     const history = [
-      { user: "Make this bold", flint: "Bold now 💪", selection: 'The seller selected the "SKU column" part.' },
+      { user: "Make this bold", flint: "Bold now 💪", selection: 'Selected "SKU column".' },
       { user: "Thanks", flint: "Any time!" },
       { user: "Bigger", flint: "Done", selection: "s".repeat(MAX_SELECTION_LENGTH) + "TAIL" },
     ];
@@ -379,7 +379,7 @@ ${"s".repeat(MAX_SELECTION_LENGTH)}`);
 
     const content: string = calls[0]!.body.input[0].content;
     expect(content).toContain(
-      'Seller: Make this bold\nThe seller selected the "SKU column" part.\nFlint: Bold now 💪\nSeller: Thanks\nFlint: Any time!',
+      'Seller: Make this bold\nSelected "SKU column".\nFlint: Bold now 💪\nSeller: Thanks\nFlint: Any time!',
     );
     expect(content).toContain(`Seller: Bigger\n${"s".repeat(MAX_SELECTION_LENGTH)}\nFlint: Done`);
     expect(content).not.toContain("TAIL");

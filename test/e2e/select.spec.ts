@@ -16,7 +16,7 @@ async function userMessage(script: { calls(): Promise<any[]> }): Promise<string>
 
 /** The selection note in a user message: the paragraph right after the request. */
 function selectionNoteOf(message: string): string {
-  const match = /\nRequest: [^\n]*\n\n(The seller selected [^\n]*)/.exec(message);
+  const match = /\nRequest: [^\n]*\n\n(Selected [^\n]*)/.exec(message);
   if (!match) throw new Error(`no selection note in:\n${message.slice(-600)}`);
   return match[1]!;
 }
@@ -110,7 +110,7 @@ test("a message sent with a selection carries its opening tag, and the bubble sh
 
   const message = await userMessage(script);
   // The tag occurs once in the template, so no occurrence is given, and nothing comes from the rendered slip.
-  expect(selectionNoteOf(message)).toBe('The seller selected the "SKU column" part. In the template it\'s the opening tag `<td class="col-sku">`.');
+  expect(selectionNoteOf(message)).toBe('Selected "SKU column", the element opening with `<td class="col-sku">` in the template.');
   // The preview's instrumentation never reaches Flint.
   expect(message).not.toContain("data-flint");
 
@@ -145,7 +145,7 @@ test("of two look-alike sections, clicking the second sends its tag as occurrenc
   await expect(ed.flintSays("Smaller now")).toBeVisible();
 
   expect(selectionNoteOf(await userMessage(second))).toBe(
-    'The seller selected the "Addresses" part. In the template it\'s the opening tag `<section class="addresses">`, occurrence 2 of 2 counting from the top.',
+    'Selected "Addresses", the element opening with `<section class="addresses">` (occurrence 2 of 2 in the template).',
   );
 });
 
@@ -167,7 +167,7 @@ test("of two parts on one template line, the clicked one's tag is sent", async (
   await expect(ed.flintSays("Green it is")).toBeVisible();
 
   expect(selectionNoteOf(await userMessage(second))).toBe(
-    'The seller selected the "Badge eco" part. In the template it\'s the opening tag `<span class="badge-eco">`.',
+    'Selected "Badge eco", the element opening with `<span class="badge-eco">` in the template.',
   );
 });
 
@@ -191,15 +191,15 @@ test("the selection survives a clarification, clears after an edit and on an ord
   await expect(ed.selectionChip).toHaveText(/Thank you/);
   await ed.flintSays("Bigger or bolder?").getByRole("button", { name: "Bolder (lifetime)" }).click();
   await expect(ed.flintSays("Bolder thanks 💪")).toBeVisible();
-  expect(await userMessage(answer)).toContain('Request: Bolder (lifetime)\n\nThe seller selected the "Thank you" part');
+  expect(await userMessage(answer)).toContain('Request: Bolder (lifetime)\n\nSelected "Thank you"');
 
   // An accepted edit clears it; the follow-up still knows what "it" was from the history.
   await expect(ed.selectionChip).toHaveCount(0);
   await ed.send("Now make it red (lifetime)");
   await expect(ed.flintSays("Red now ❤️")).toBeVisible();
   const history = await userMessage(followUp);
-  expect(history).toContain('Seller: Bolder (lifetime)\nThe seller selected the "Thank you" part');
-  expect(history).not.toContain("Request: Now make it red (lifetime)\n\nThe seller selected");
+  expect(history).toContain('Seller: Bolder (lifetime)\nSelected "Thank you"');
+  expect(history).not.toContain("Request: Now make it red (lifetime)\n\nSelected");
 
   // Undo and Redo re-render the slip, so each clears the selection.
   await ed.working.locator(".thank-you").click();
@@ -239,7 +239,7 @@ test("Try again resends the selection the message was sent with", async ({ page,
   await ed.tryAgainButton.click();
   await expect(ed.flintSays("Tighter totals")).toBeVisible();
 
-  const note = 'Request: Shrink this (retry)\n\nThe seller selected the "Totals" part';
+  const note = 'Request: Shrink this (retry)\n\nSelected "Totals"';
   expect(await userMessage(first)).toContain(note);
   expect(await userMessage(retry)).toContain(note);
   await expect(ed.turn("Shrink this (retry)").locator('[data-author="seller"]')).toContainText("📍 Totals");
