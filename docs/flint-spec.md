@@ -139,7 +139,7 @@ See `docs/adr/0001-embed-flint-in-the-sellers-app.md`. This is for the demo vide
 - The app opens the deployed Flint in an Electron view. Its preload script exposes `window.flintHost`. When the bridge is present, Flint runs in **embedded mode**; without it, Flint behaves exactly as it does on the web.
 - The bridge contract, defined as a TypeScript type in this repository for the app to implement:
   - `open()` returns `{ template: { name, paper, source }, shop: Shop, accessCode }`.
-  - `save({ mode: "overwrite" | "new", name, paper, source })` resolves once the app has written the file.
+  - `save({ mode: "overwrite" | "new", name, paper, source, assets })` resolves once the app has written the file. `assets` holds the uploaded images (name to data URL) that the saved template uses, so the app can print it.
   - `onCloseRequested(handler)` is how the app's Back button asks to close, and `close()` is how Flint tells the app it can close.
 - Embedded mode opens straight into the editor on the app's template and the app's shop. There is no shop switcher and no template picker. The example-order switcher stays, using the shop's mock orders.
 - The access code comes from `open()`, so nothing is typed. The app keeps it in a local setting that is never committed.
@@ -200,7 +200,7 @@ It covers the persona, the rules below, the typed schema with example values and
    - **`edit_template`:** apply the edits, parse, then render against every example order for the shop, using placeholder assets. If that succeeds, return the new template and summary. If not, send the reasoning, function call and a `function_call_output` saying the edit was rejected, with the specific error, that the template is unchanged, and that it should call `edit_template` again.
 4. After the last attempt fails, return an "invalid" error.
 - **Retry strategy:** feedback only (send the error back). There's no fresh final attempt.
-- The browser re-renders with the real assets and computes the what-changed line and the item warnings. Uploaded images never leave the browser.
+- The browser re-renders with the real assets and computes the what-changed line and the item warnings. Uploaded images never go to the Worker. In embedded mode, saving hands the ones the template uses to the host app.
 
 ### Item-change counter (browser)
 After each accepted edit, it renders every example order before and after and counts how many times each existing line item's title appears. It produces the what-changed line, the "⚠️ Missing items" warning (naming items and orders) and the "⚠️ Extra items" warning. This uses no tokens. It never blocks an edit. Only existing items are counted, so new lines aren't "extra".
