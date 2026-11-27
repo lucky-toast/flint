@@ -86,16 +86,25 @@ body {
   max-width: 720px;
 }
 
+/* Both headings sit in a row of the same fixed height, centred, so "Original" and "Working" share one line
+   whatever controls sit beside them. */
 .slip-pane-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 4px 10px;
+  min-height: 28px;
   margin-bottom: 8px;
 }
 
 .slip-pane-head h2 {
   margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 28px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #1f1b18;
 }
 
 .slip-pane-head .what-changed {
@@ -126,7 +135,6 @@ body {
   min-width: 0;
 }
 
-.slip-pane h2,
 .chat h2 {
   margin: 0 0 8px;
   font-size: 13px;
