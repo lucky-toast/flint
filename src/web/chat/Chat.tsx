@@ -76,6 +76,11 @@ export function Chat({
         ))}
         {thinking && (
           <p className="thinking" role="status">
+            <span className="thinking-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
             Flint is thinking…
           </p>
         )}

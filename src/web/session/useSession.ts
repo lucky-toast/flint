@@ -43,6 +43,12 @@ export type SessionOptions = {
   onEdited?: () => void;
 };
 
+/**
+ * The shortest time Flint "thinks". Recorded replies come back instantly, which reads as canned;
+ * a beat of thinking keeps the reply from popping in before the seller's message has settled.
+ */
+const MIN_THINKING_MS = 900;
+
 /** The editor session for one shop + template, wired to the Worker. */
 export function useSession(shop: Shop, template: Template, options: SessionOptions = {}): SessionApi {
   const [state, dispatch] = useReducer(sessionReducer, template.source, createSession);
@@ -73,7 +79,8 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
         ...(selection ? { selection: selection.note } : {}),
         uploadedAssets: uploadedAssetNames.current?.() ?? [],
       };
-      void postTurn(request).then((result) => {
+      const beat = new Promise((resolve) => setTimeout(resolve, MIN_THINKING_MS));
+      void Promise.all([postTurn(request), beat]).then(([result]) => {
         apply({ type: "replied", turnId, result });
         if (result.type === "edit") onEdited.current?.();
       });

@@ -10,7 +10,7 @@ import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
 import { OrderHint } from "./OrderHint";
 import { OrderPicker } from "./OrderPicker";
-import { ShowCode } from "./ShowCode";
+import { CodeView, ShowCodeToggle } from "./ShowCode";
 import { SlipActions } from "./SlipActions";
 import { SlipPane } from "./SlipPane";
 
@@ -49,6 +49,9 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
     return result;
   };
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
+  const [codeShown, setCodeShown] = useState(false);
+  // On a narrow screen the seller can fold the original away so the working slip gets the room.
+  const [originalHidden, setOriginalHidden] = useState(false);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
   const switchOrder = (id: string) => {
     // Another order may not have the part, so the selection clears.
@@ -68,6 +71,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
             Redo <span aria-hidden="true">↷</span>
           </button>
         </div>
+        <ShowCodeToggle shown={codeShown} onChange={setCodeShown} />
         <SlipActions
           shop={shop}
           template={template}
@@ -79,15 +83,22 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           }}
         />
       </div>
-      <div className="editor-panes">
-        <SlipPane
-          label="Original"
-          source={session.state.original}
-          shop={shop}
-          order={order}
-          paper={template.paper}
-          assets={uploads.assets}
-        />
+      <div className={originalHidden ? "editor-panes editor-panes-single" : "editor-panes"}>
+        {!originalHidden && (
+          <SlipPane
+            label="Original"
+            source={session.state.original}
+            shop={shop}
+            order={order}
+            paper={template.paper}
+            assets={uploads.assets}
+            action={
+              <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(true)}>
+                Hide original
+              </button>
+            }
+          />
+        )}
         <SlipPane
           label="Working"
           source={workingSource(session.state)}
@@ -97,7 +108,14 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           assets={uploads.assets}
           onDocument={slipSelection.onDocument}
           glowOnChange
-          footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
+          action={
+            originalHidden && (
+              <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(false)}>
+                Show original
+              </button>
+            )
+          }
+          footer={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
           <OrderHint

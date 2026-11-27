@@ -1,27 +1,24 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo } from "react";
 import { codeDiff } from "./code-diff";
 
-type Props = { original: string; working: string };
-
 /**
- * A hidden-by-default "Show code" toggle for curious sellers: the working template's Liquid and
- * a line diff against the original. The chat itself never shows code.
+ * The "Show code" toggle for curious sellers, in the editor toolbar. The code itself (CodeView)
+ * shows under the working slip. The chat never shows code.
  */
-export function ShowCode({ original, working }: Props) {
-  const [shown, setShown] = useState(false);
+export function ShowCodeToggle({ shown, onChange }: { shown: boolean; onChange: (shown: boolean) => void }) {
   const id = useId();
   return (
-    <div className="show-code">
-      <label className="show-code-toggle" htmlFor={id}>
-        <input id={id} type="checkbox" checked={shown} onChange={(e) => setShown(e.target.checked)} />
-        Show code
-      </label>
-      {shown && <CodeView original={original} working={working} />}
-    </div>
+    <label className="show-code-toggle" htmlFor={id}>
+      <input id={id} type="checkbox" checked={shown} onChange={(e) => onChange(e.target.checked)} />
+      Show code
+    </label>
   );
 }
 
-function CodeView({ original, working }: Props) {
+type Props = { original: string; working: string };
+
+/** The working template's Liquid and a line diff against the original. */
+export function CodeView({ original, working }: Props) {
   const rows = useMemo(() => codeDiff(original, working), [original, working]);
   return (
     <section className="code-view" aria-label="Template code">

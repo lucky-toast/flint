@@ -75,6 +75,36 @@ body {
   column-gap: 16px;
 }
 
+.editor-panes-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* With the original folded away, the working slip stays a sensible size rather than filling the row. */
+.editor-panes-single .slip-pane {
+  max-width: 720px;
+}
+
+.slip-pane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.pane-toggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pane-toggle:hover {
+  color: var(--accent);
+}
+
 .slip-pane {
   display: grid;
   grid-row: span 4;
@@ -258,10 +288,56 @@ body {
 }
 
 .thinking {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f4efea;
   font-size: 13px;
   color: var(--muted);
-  font-style: italic;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.3;
+  animation: thinking-dot 1.2s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .composer {
@@ -311,17 +387,18 @@ body {
   cursor: default;
 }
 
-.show-code {
-  margin-top: 8px;
-  font-size: 13px;
-}
-
 .show-code-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 14px;
   color: var(--muted);
   cursor: pointer;
+}
+
+.code-view {
+  margin-top: 8px;
+  font-size: 13px;
 }
 
 .code-view h3 {

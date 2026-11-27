@@ -20,17 +20,22 @@ type Props = {
    * source lines, and hand each loaded slip document to this callback.
    */
   onDocument?: (doc: Document) => void;
+  /** A small control beside the heading (e.g. hide or show the original). */
+  action?: ReactNode;
   /** Glow briefly whenever the source changes after the first render, so the eye goes to the new slip. */
   glowOnChange?: boolean;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, glowOnChange }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, glowOnChange, action }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets, { instrument: !!onDocument });
   const glow = useChangeCount(source);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
-      <h2>{label}</h2>
+      <div className="slip-pane-head">
+        <h2>{label}</h2>
+        {action}
+      </div>
       {/* Every pane has the same four rows (lined up across panes), so notes never push one slip below the other. */}
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
