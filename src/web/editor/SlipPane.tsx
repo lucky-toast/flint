@@ -22,12 +22,15 @@ type Props = {
   onDocument?: (doc: Document) => void;
   /** A small control beside the heading (e.g. hide or show the original). */
   action?: ReactNode;
+  /** Zoom on the desk, shared by both panes so they stay comparable. */
+  zoom?: number;
+  onZoom?: (zoom: number) => void;
   /** Glow briefly whenever the source changes after the first render, so the eye goes to the new slip. */
   glowOnChange?: boolean;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, glowOnChange, action }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, glowOnChange, action, zoom, onZoom }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets, { instrument: !!onDocument });
   const glow = useChangeCount(source);
   return (
@@ -39,7 +42,7 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
       {/* Every pane has the same four rows (lined up across panes), so notes never push one slip below the other. */}
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
-        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} glow={glowOnChange ? glow : 0} desk />}
+        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} glow={glowOnChange ? glow : 0} desk zoom={zoom} onZoom={onZoom} />}
         {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
         {rendered.status === "error" && (
           <p className="slip-status" role="alert">

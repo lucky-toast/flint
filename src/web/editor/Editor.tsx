@@ -52,6 +52,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   const [codeShown, setCodeShown] = useState(false);
   // On a narrow screen the seller can fold the original away so the working slip gets the room.
   const [originalHidden, setOriginalHidden] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
   const switchOrder = (id: string) => {
     // Another order may not have the part, so the selection clears.
@@ -92,6 +93,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
             order={order}
             paper={template.paper}
             assets={uploads.assets}
+            zoom={zoom}
+            onZoom={setZoom}
             action={
               <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(true)}>
                 Hide original
@@ -107,6 +110,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           paper={template.paper}
           assets={uploads.assets}
           onDocument={slipSelection.onDocument}
+          zoom={zoom}
+          onZoom={setZoom}
           glowOnChange
           action={
             originalHidden && (
