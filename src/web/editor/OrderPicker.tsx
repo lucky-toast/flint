@@ -6,7 +6,7 @@ type Props = { orders: Order[]; orderId: string; onChange: (orderId: string) => 
 export function OrderPicker({ orders, orderId, onChange }: Props) {
   return (
     <label className="order-picker">
-      Example order
+      <span className="order-picker-label">Example order</span>
       <select value={orderId} onChange={(e) => onChange(e.target.value)}>
         {orders.map((o) => (
           <option key={o.id} value={o.id}>

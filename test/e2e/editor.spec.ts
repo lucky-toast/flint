@@ -66,6 +66,21 @@ test("switching the example order re-renders both slips", async ({ page }) => {
   }
 });
 
+test("the example order picker sits on the Original heading and hides with the original", async ({ page }) => {
+  const ed = editor(page);
+  await page.goto("/");
+  const originalPane = page.getByRole("region", { name: "Original slip" });
+  await originalPane.getByLabel("Example order").selectOption({ label: "#1002 · Gift order" });
+
+  await page.getByRole("button", { name: "Hide original" }).click();
+  await expect(ed.orderPicker).toHaveCount(0);
+  // The working slip keeps the order picked before hiding.
+  await expect(ed.working.getByText("Order #1002")).toBeVisible();
+
+  await page.getByRole("button", { name: "Show original" }).click();
+  await expect(originalPane.getByLabel("Example order")).toHaveValue("kiln-1002");
+});
+
 test("Flint is thinking from send until the reply arrives", async ({ page, ember }) => {
   await ember.script(
     { delayMs: 1500 },
