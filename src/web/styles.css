@@ -94,7 +94,9 @@ body {
   align-items: center;
   gap: 4px 10px;
   min-height: 28px;
-  margin-bottom: 8px;
+  /* Close above the desk and in from its rounded edge, like a label on it. */
+  margin-bottom: 2px;
+  padding: 0 10px;
 }
 
 .slip-pane-head h2 {
