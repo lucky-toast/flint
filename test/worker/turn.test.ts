@@ -1,5 +1,6 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MAX_SELECTION_LENGTH } from "../../src/core";
 import { builtInTemplates } from "../../src/data";
 import { turnHeaders } from "./client";
 import { commentary, editCall, fakeEmber, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
@@ -320,6 +321,74 @@ describe("POST /api/turn, requests", () => {
 Flint: ${"f".repeat(1000)}`);
     expect(content).not.toContain("USERTAIL");
     expect(content).not.toContain("FLINTTAIL");
+  });
+
+  it("sends the seller's selection right after the request, after the template", async () => {
+    const calls = fakeEmber(sortEdit());
+    const selection = 'Selected "SKU column", the element opening with `<td class="col-sku">` in the template.';
+
+    await turnJson({ message: "Make this bold", selection });
+
+    const content: string = calls[0]!.body.input[0].content;
+    expect(content).toContain(`Request: Make this bold\n\n${selection}`);
+    expect(content.indexOf("Current template:")).toBe(0);
+  });
+
+  it("doesn't count the selection against the 500-character message cap", async () => {
+    const calls = fakeEmber(sortEdit());
+
+    await turnJson({ message: "m".repeat(500), selection: "s".repeat(MAX_SELECTION_LENGTH) });
+
+    expect(calls[0]!.body.input[0].content).toContain(`${"m".repeat(500)}
+
+${"s".repeat(MAX_SELECTION_LENGTH)}`);
+  });
+
+  it("caps a selection at 200 characters", () => {
+    expect(MAX_SELECTION_LENGTH).toBe(200);
+  });
+
+  it(`trims a selection over ${MAX_SELECTION_LENGTH} characters instead of refusing the turn`, async () => {
+    const calls = fakeEmber(sortEdit());
+
+    await turnJson({ message: "Sort items", selection: "s".repeat(MAX_SELECTION_LENGTH) + "TAIL" });
+
+    const content: string = calls[0]!.body.input[0].content;
+    expect(content).toContain("s".repeat(MAX_SELECTION_LENGTH));
+    expect(content).not.toContain("TAIL");
+  });
+
+  it("refuses a selection that isn't a string", async () => {
+    const calls = fakeEmber(sortEdit());
+
+    const res = await turn({ message: "Sort items", selection: { name: "SKU column" } });
+
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("keeps each history turn's selection beside that turn, trimmed", async () => {
+    const calls = fakeEmber(sortEdit());
+    const history = [
+      { user: "Make this bold", flint: "Bold now 💪", selection: 'Selected "SKU column".' },
+      { user: "Thanks", flint: "Any time!" },
+      { user: "Bigger", flint: "Done", selection: "s".repeat(MAX_SELECTION_LENGTH) + "TAIL" },
+    ];
+
+    await turnJson({ message: "Now make it red", history });
+
+    const content: string = calls[0]!.body.input[0].content;
+    expect(content).toContain(
+      'Seller: Make this bold\nSelected "SKU column".\nFlint: Bold now 💪\nSeller: Thanks\nFlint: Any time!',
+    );
+    expect(content).toContain(`Seller: Bigger\n${"s".repeat(MAX_SELECTION_LENGTH)}\nFlint: Done`);
+    expect(content).not.toContain("TAIL");
+  });
+
+  it("refuses a history turn whose selection isn't a string", async () => {
+    const res = await turn({ message: "Sort items", history: [{ user: "a", flint: "b", selection: 3 }] });
+
+    expect(res.status).toBe(400);
   });
 
   it("refuses a request body over 100 KB without calling Ember", async () => {

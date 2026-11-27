@@ -5,6 +5,8 @@
   --line: #ddd5ce;
   --muted: #6b5f57;
   --accent: #b5532f;
+  /* Pointing at the working slip: the chip, and the boxes and name tag inside the slip. */
+  --selection: #e8590c;
 }
 
 body {
@@ -654,4 +656,53 @@ body {
 .chip:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Pointing at the working slip: the chip above the message box and the tag on the seller's bubble. */
+.selection-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.selection-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--selection);
+  border-radius: 999px;
+  background: #fff1e8;
+  color: #8a3305;
+  font-size: 13px;
+}
+
+.selection-chip button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.selection-chip .selection-bigger {
+  border: 1px solid var(--selection);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.selection-chip .selection-clear {
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.selection-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.16);
+  font-size: 12px;
 }

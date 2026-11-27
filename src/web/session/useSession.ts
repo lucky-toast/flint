@@ -11,14 +11,18 @@ import {
   workingSource,
   type Session,
   type SessionAction,
+  type TurnSelection,
 } from "./session";
 
 export type SessionApi = {
   state: Session;
   /** True from send until Flint's reply arrives. */
   thinking: boolean;
-  /** Sends a seller message to Flint. Ignored while Flint is thinking or when empty/too long. */
-  send: (message: string) => void;
+  /**
+   * Sends a seller message to Flint, with what they pointed at on the working slip, if anything.
+   * Ignored while Flint is thinking or when empty/too long.
+   */
+  send: (message: string, selection?: TurnSelection) => void;
   /** Steps the working slip back one version. Ignored when there's nothing to undo. */
   undo: () => void;
   /** Reapplies the most recently undone version. Ignored when the Redo stack is empty. */
@@ -52,9 +56,12 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
     latest.current = sessionReducer(latest.current, action);
   }, []);
 
-  /** Asks Flint about the pending turn `turnId`, against the working slip and history as they are now. */
+  /**
+   * Asks Flint about the pending turn `turnId`, against the working slip and history as they are
+   * now, with the selection it was sent with and, for Try again, a hint of the last attempt.
+   */
   const ask = useCallback(
-    (turnId: number, message: string, retryHint?: string) => {
+    (turnId: number, message: string, { selection, retryHint }: { selection?: TurnSelection; retryHint?: string } = {}) => {
       const current = latest.current;
       const request = {
         shopId: shop.id,
@@ -62,6 +69,7 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
         history: historyForEmber(current),
         message,
         ...(retryHint ? { retryHint } : {}),
+        ...(selection ? { selection: selection.note } : {}),
         uploadedAssets: uploadedAssetNames.current?.() ?? [],
       };
       void postTurn(request).then((result) => apply({ type: "replied", turnId, result }));
@@ -70,14 +78,14 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
   );
 
   const send = useCallback(
-    (raw: string) => {
+    (raw: string, selection?: TurnSelection) => {
       const message = raw.trim();
       const current = latest.current;
       if (!message || message.length > MAX_MESSAGE_LENGTH || pendingTurn(current)) return;
       const turnId = current.nextTurnId;
-      apply({ type: "sent", message });
+      apply({ type: "sent", message, ...(selection ? { selection } : {}) });
       // The new turn is pending, so it isn't in the history yet.
-      ask(turnId, message);
+      ask(turnId, message, { selection });
     },
     [apply, ask],
   );
@@ -92,7 +100,11 @@ export function useSession(shop: Shop, template: Template, options: SessionOptio
     apply({ type: "retried", turnId: turn.id });
     // The retried turn is pending now, so it's absent from the history, and its edit is off the stack.
     // The Worker takes hints up to a message's length; a long summary is cut to fit.
-    ask(turn.id, turn.message, flintText(turn.result).slice(0, MAX_MESSAGE_LENGTH));
+    // It goes with the selection the turn was first sent with.
+    ask(turn.id, turn.message, {
+      selection: turn.selection,
+      retryHint: flintText(turn.result).slice(0, MAX_MESSAGE_LENGTH),
+    });
   }, [apply, ask]);
 
   const saved = useCallback(() => apply({ type: "saved" }), [apply]);

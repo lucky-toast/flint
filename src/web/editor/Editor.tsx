@@ -3,6 +3,8 @@ import type { Shop, Template } from "../../core";
 import { uploadFollowUp } from "../assets/asset-store";
 import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
+import { SelectionChip } from "../chat/SelectionChip";
+import { useSlipSelection } from "../selection/useSlipSelection";
 import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
@@ -30,12 +32,16 @@ type Props = {
 export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }: Props) {
   const uploads = useUploadedAssets(shop);
   const session = useSession(shop, template, { uploadedAssetNames: uploads.uploadedNames });
+  // Clears itself whenever the working slip's template changes (an edit, Undo, Redo, Try again).
+  const slipSelection = useSlipSelection(workingSource(session.state));
+  /** Every message goes with what the seller pointed at; a question back from Flint keeps it. */
+  const send = (message: string) => session.send(message, slipSelection.selection);
   const unsaved = hasUnsavedChanges(session.state);
   useEffect(() => onUnsavedChange?.(unsaved), [unsaved, onUnsavedChange]);
   // After an upload, a follow-up turn tells Flint the image is there so it carries on.
   const upload = async (file: File, name: string) => {
     const result = await uploads.upload(file, name);
-    if (result.ok) session.send(uploadFollowUp(result.name));
+    if (result.ok) send(uploadFollowUp(result.name));
     return result;
   };
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
@@ -44,7 +50,15 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   return (
     <div className="editor">
       <div className="editor-toolbar">
-        <OrderPicker orders={shop.orders} orderId={order.id} onChange={setOrderId} />
+        <OrderPicker
+          orders={shop.orders}
+          orderId={order.id}
+          onChange={(id) => {
+            // Another order may not have the part, so the selection clears.
+            slipSelection.clear();
+            setOrderId(id);
+          }}
+        />
         <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
           Undo
         </button>
@@ -78,6 +92,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           order={order}
           paper={template.paper}
           assets={uploads.assets}
+          pointing={{ onDocument: slipSelection.onDocument }}
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
@@ -86,12 +101,20 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
       <Chat
         turns={session.state.turns}
         thinking={session.thinking}
-        onSend={session.send}
+        onSend={send}
         retryTurnId={retryableTurn(session.state)?.id}
         onTryAgain={session.tryAgain}
         onUpload={upload}
         redoPending={session.state.redo.length > 0}
         replayChips={replayChips}
+        selectionChip={
+          <SelectionChip
+            name={slipSelection.selection?.name}
+            canSelectBigger={slipSelection.canSelectBigger}
+            onSelectBigger={slipSelection.selectBigger}
+            onClear={slipSelection.clear}
+          />
+        }
       />
     </div>
   );

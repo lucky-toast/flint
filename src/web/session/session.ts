@@ -5,10 +5,18 @@ import { flintText } from "./flint-text";
 // Pure data and a reducer, so features (undo, try again, uploads, chips…) add actions here and
 // components only read selectors. Nothing here talks to the network; see useSession.ts.
 
+/**
+ * What the seller pointed at when sending a turn: the part's name for the chat tag, and the note
+ * Flint is told (its name and template code), kept for the history and Try again.
+ */
+export type TurnSelection = { name: string; note: string };
+
 /** One exchange: what the seller sent and, once it arrives, Flint's outcome. */
 export type Turn = {
   id: number;
   message: string;
+  /** The selection the message was sent with, if any. */
+  selection?: TurnSelection;
   /** Undefined while Flint is thinking. */
   result?: TurnResult;
   /** Undone turns stay in the chat (marked) but are dropped from the history sent to Ember. */
@@ -34,7 +42,7 @@ export type Session = {
 };
 
 export type SessionAction =
-  | { type: "sent"; message: string }
+  | { type: "sent"; message: string; selection?: TurnSelection }
   | { type: "replied"; turnId: number; result: TurnResult }
   /** Steps the working slip back one version and marks that edit's turn undone. */
   | { type: "undid" }
@@ -48,6 +56,11 @@ export type SessionAction =
   /** The working slip was saved: it becomes the original that later edits compare against. */
   | { type: "saved" };
 
+/** A turn as the seller sent it, without Flint's outcome. */
+function asSent({ id, message, selection }: Pick<Turn, "id" | "message" | "selection">): Turn {
+  return selection ? { id, message, selection } : { id, message };
+}
+
 export function createSession(source: string): Session {
   return { original: source, versions: [{ source, turnId: null }], turns: [], nextTurnId: 1, redo: [] };
 }
@@ -55,7 +68,7 @@ export function createSession(source: string): Session {
 export function sessionReducer(state: Session, action: SessionAction): Session {
   switch (action.type) {
     case "sent": {
-      const turn: Turn = { id: state.nextTurnId, message: action.message };
+      const turn = asSent({ id: state.nextTurnId, message: action.message, selection: action.selection });
       // Any message clears Redo: the turns on the stack stay undone for good.
       return { ...state, turns: [...state.turns, turn], nextTurnId: state.nextTurnId + 1, redo: [] };
     }
@@ -64,11 +77,11 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       const retried = state.turns.find((t) => t.id === turnId)?.retrying;
       if (retried && result.type === "error") {
         const turns = state.turns.map((t) =>
-          t.id === turnId ? { id: t.id, message: t.message, result: retried.result, note: result.error } : t,
+          t.id === turnId ? { ...asSent(t), result: retried.result, note: result.error } : t,
         );
         return { ...state, turns, versions: [...state.versions, retried.version] };
       }
-      const turns = state.turns.map((t) => (t.id === turnId ? { id: t.id, message: t.message, result } : t));
+      const turns = state.turns.map((t) => (t.id === turnId ? { ...asSent(t), result } : t));
       const versions =
         result.type === "edit" ? [...state.versions, { source: result.templateSource, turnId }] : state.versions;
       return { ...state, turns, versions };
@@ -93,7 +106,7 @@ export function sessionReducer(state: Session, action: SessionAction): Session {
       const turn = retryableTurn(state);
       if (pendingTurn(state) || turn?.id !== action.turnId) return state;
       const retrying = { result: turn.result, version: state.versions[state.versions.length - 1]! };
-      const turns = state.turns.map((t) => (t.id === action.turnId ? { id: t.id, message: t.message, retrying } : t));
+      const turns = state.turns.map((t) => (t.id === action.turnId ? { ...asSent(t), retrying } : t));
       return { ...state, turns, versions: state.versions.slice(0, -1) };
     }
     case "saved":
@@ -142,5 +155,9 @@ export function historyForEmber(state: Session): HistoryTurn[] {
   return state.turns
     .filter((t): t is Turn & { result: TurnResult } => !!t.result && !t.undone && t.result.type !== "error")
     .slice(-HISTORY_LIMIT)
-    .map((t) => ({ user: t.message, flint: flintText(t.result) }));
+    .map((t) => ({
+      user: t.message,
+      flint: flintText(t.result),
+      ...(t.selection ? { selection: t.selection.note } : {}),
+    }));
 }

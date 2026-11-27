@@ -7,6 +7,7 @@ export * from "./edits";
 export * from "./validate";
 export * from "./assets";
 export * from "./prompt";
+export * from "./selection";
 export * from "./ember";
 export * from "./turn";
 export * from "./pricing";
