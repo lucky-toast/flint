@@ -8,6 +8,7 @@ import { useSlipSelection } from "../selection/useSlipSelection";
 import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
+import { OrderHint } from "./OrderHint";
 import { OrderPicker } from "./OrderPicker";
 import { ShowCode } from "./ShowCode";
 import { SlipActions } from "./SlipActions";
@@ -49,19 +50,16 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   };
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
+  const switchOrder = (id: string) => {
+    // Another order may not have the part, so the selection clears.
+    slipSelection.clear();
+    setOrderId(id);
+  };
 
   return (
     <div className="editor">
       <div className="editor-toolbar">
-        <OrderPicker
-          orders={shop.orders}
-          orderId={order.id}
-          onChange={(id) => {
-            // Another order may not have the part, so the selection clears.
-            slipSelection.clear();
-            setOrderId(id);
-          }}
-        />
+        <OrderPicker orders={shop.orders} orderId={order.id} onChange={switchOrder} />
         <div className="undo-redo" role="group" aria-label="History">
           <button type="button" onClick={session.undo} disabled={!canUndo(session.state)} title="Undo Flint's last edit">
             <span aria-hidden="true">↶</span> Undo
@@ -101,6 +99,14 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
+          <OrderHint
+            original={session.state.original}
+            working={workingSource(session.state)}
+            shop={shop}
+            order={order}
+            assets={uploads.assets}
+            onShowOrder={switchOrder}
+          />
         </SlipPane>
       </div>
       <Chat

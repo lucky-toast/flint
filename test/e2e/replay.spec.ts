@@ -144,3 +144,22 @@ test("a valid access code switches to live mode; a wrong one is refused", async 
   await page.reload();
   await expect(r.badge).toHaveText("Live");
 });
+
+test("a change that doesn't show on the order on screen says so and offers an order where it does", async ({ page }) => {
+  const ed = editor(page);
+  const r = replay(page);
+  await page.goto("/");
+  const hint = page.getByRole("region", { name: "Working slip" }).getByTestId("order-hint");
+
+  // The gift message only renders on gift orders; the large order on screen isn't one.
+  await r.chip(GIFT_MESSAGE).click();
+  await expect(hint).toContainText("This change may not show on order #1003.");
+  await hint.getByRole("button", { name: /See it on #1002/ }).click();
+  await expect(ed.working.getByText("Happy birthday, Mira!")).toBeVisible();
+  await expect(hint).toHaveCount(0);
+
+  // A change that shows on every order (a bigger logo) gives no hint.
+  await r.chip(BIGGER_LOGO).click();
+  await expect(ed.flintSays(/logo/i).last()).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});

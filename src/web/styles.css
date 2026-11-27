@@ -159,7 +159,7 @@ body {
 
 /* While Redo has something to reapply, above the message box. */
 .redo-warning {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
@@ -273,6 +273,10 @@ body {
   cursor: pointer;
 }
 
+.composer button:hover:not(:disabled) {
+  background: #9e4626;
+}
+
 .composer button:disabled {
   opacity: 0.5;
   cursor: default;
@@ -353,6 +357,26 @@ body {
 
 .what-changed {
   color: var(--muted);
+}
+
+.order-hint {
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef3fb;
+  border: 1px solid #c9d7ee;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.order-hint-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #2c5aa0;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .item-warning {
@@ -436,8 +460,32 @@ body {
   color: var(--muted);
 }
 
+/* The thumbnail: the slip as a sheet of paper on a soft backdrop, centred. */
 .template-card-preview {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 6px;
+  background: #f4efea;
+}
+
+.template-card-preview .slip-preview-box {
+  max-width: 200px;
+}
+
+.template-card {
+  transition: box-shadow 150ms, transform 150ms;
+}
+
+.template-card:hover {
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+  transform: translateY(-2px);
+}
+
+.template-card button:hover {
+  background: #9e4626;
 }
 
 .template-card button {
@@ -734,13 +782,14 @@ summary:focus-visible {
 
 /* Pointing at the working slip: the chip above the message box and the tag on the seller's bubble. */
 .selection-tip {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 12px;
   color: var(--muted);
 }
 
 .selection-chip {
   align-self: flex-start;
+  margin-bottom: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
