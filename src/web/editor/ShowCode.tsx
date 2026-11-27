@@ -1,17 +1,20 @@
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { codeDiff } from "./code-diff";
 
 /**
- * The "Show code" toggle for curious sellers, in the editor toolbar. The code itself (CodeView)
- * shows under the working slip. The chat never shows code.
+ * Slip / Code, on the Working pane's heading: Code shows the working template in place of the slip,
+ * for curious sellers. The chat itself never shows code.
  */
-export function ShowCodeToggle({ shown, onChange }: { shown: boolean; onChange: (shown: boolean) => void }) {
-  const id = useId();
+export function SlipCodeSwitch({ shown, onChange }: { shown: boolean; onChange: (shown: boolean) => void }) {
   return (
-    <label className="show-code-toggle" htmlFor={id}>
-      <input id={id} type="checkbox" checked={shown} onChange={(e) => onChange(e.target.checked)} />
-      Show code
-    </label>
+    <div className="slip-code-switch" role="group" aria-label="Show the working slip or its code">
+      <button type="button" aria-pressed={!shown} onClick={() => onChange(false)}>
+        Slip
+      </button>
+      <button type="button" aria-pressed={shown} onClick={() => onChange(true)}>
+        Code
+      </button>
+    </div>
   );
 }
 

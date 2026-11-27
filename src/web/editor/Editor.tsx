@@ -10,7 +10,7 @@ import { useSession } from "../session/useSession";
 import { ItemChanges } from "./ItemChanges";
 import { OrderHint } from "./OrderHint";
 import { OrderPicker } from "./OrderPicker";
-import { CodeView, ShowCodeToggle } from "./ShowCode";
+import { CodeView, SlipCodeSwitch } from "./ShowCode";
 import { SlipActions } from "./SlipActions";
 import { SlipPane } from "./SlipPane";
 
@@ -72,7 +72,6 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
             Redo <span aria-hidden="true">↷</span>
           </button>
         </div>
-        <ShowCodeToggle shown={codeShown} onChange={setCodeShown} />
         <SlipActions
           shop={shop}
           template={template}
@@ -114,13 +113,16 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           onZoom={setZoom}
           glowOnChange
           action={
-            originalHidden && (
-              <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(false)}>
-                Show original
-              </button>
-            )
+            <>
+              <SlipCodeSwitch shown={codeShown} onChange={setCodeShown} />
+              {originalHidden && (
+                <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(false)}>
+                  Show original
+                </button>
+              )}
+            </>
           }
-          footer={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
+          cover={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
           <OrderHint
