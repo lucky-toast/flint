@@ -62,12 +62,14 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
             setOrderId(id);
           }}
         />
-        <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
-          Undo
-        </button>
-        <button type="button" onClick={session.redo} disabled={!canRedo(session.state)}>
-          Redo
-        </button>
+        <div className="undo-redo" role="group" aria-label="History">
+          <button type="button" onClick={session.undo} disabled={!canUndo(session.state)} title="Undo Flint's last edit">
+            <span aria-hidden="true">↶</span> Undo
+          </button>
+          <button type="button" onClick={session.redo} disabled={!canRedo(session.state)} title="Redo the edit you undid">
+            Redo <span aria-hidden="true">↷</span>
+          </button>
+        </div>
         <SlipActions
           shop={shop}
           template={template}

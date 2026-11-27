@@ -54,7 +54,7 @@ export function App() {
         <ShopSwitcher shops={shops} shopId={shop.id} onChange={switchShop} />
         {screen.kind === "editor" && (
           <>
-            <p>
+            <p className="app-header-context">
               {shop.name} · {screen.template.name}
             </p>
             <button
@@ -62,7 +62,7 @@ export function App() {
               className="app-header-button"
               onClick={() => leaveEditor(() => setScreen({ kind: "picker" }))}
             >
-              Templates
+              <span aria-hidden="true">← </span>Templates
             </button>
           </>
         )}

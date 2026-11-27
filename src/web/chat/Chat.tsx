@@ -81,7 +81,14 @@ export function Chat({
         )}
         <div ref={end} />
       </div>
-      {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
+      {replayChips && (
+        <ReplayChips
+          requests={replayChips}
+          disabled={thinking}
+          onChoose={onSend}
+          used={new Set(turns.filter((t) => !t.undone).map((t) => t.message))}
+        />
+      )}
       {redoPending && <p className="redo-warning">Your next message clears Redo.</p>}
       {selectionChip}
       <Composer disabled={thinking} onSend={onSend} />

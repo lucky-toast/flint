@@ -13,7 +13,7 @@ body {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
   padding: 12px 24px;
   background: #fff;
@@ -66,11 +66,21 @@ body {
   padding: 4px 8px;
 }
 
+/* Each pane spans the same four rows (heading, notes, slip, footer) so the two slips stay level. */
 .editor-panes {
   grid-area: panes;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-rows: auto auto auto auto;
+  column-gap: 16px;
+}
+
+.slip-pane {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
 }
 
 .slip-pane h2,
@@ -367,15 +377,9 @@ body {
   padding: 4px 8px;
 }
 
-.app-header-button {
+/* The mode badge and access code sit at the far right of the header. */
+.app-header .access {
   margin-left: auto;
-  font: inherit;
-  font-size: 14px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
 }
 
 .template-picker h2 {
@@ -454,7 +458,10 @@ body {
   margin-left: auto;
 }
 
-.slip-actions button,
+/* One look for the plain buttons: header, toolbar, dialogs. */
+.app-header-button,
+.editor-toolbar button,
+.access-form button,
 .modal button {
   font: inherit;
   font-size: 14px;
@@ -462,12 +469,47 @@ body {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
+  color: #1f1b18;
   cursor: pointer;
+  transition: background-color 120ms, border-color 120ms;
 }
 
-.slip-actions button:disabled {
+.app-header-button:hover:not(:disabled),
+.editor-toolbar button:hover:not(:disabled),
+.access-form button:hover:not(:disabled),
+.modal button:hover:not(:disabled) {
+  background: #f7f3ef;
+  border-color: #c9bdb3;
+}
+
+.editor-toolbar button:disabled,
+.access-form button:disabled {
   cursor: default;
+  color: var(--muted);
   opacity: 0.5;
+}
+
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Undo and Redo read as one control. */
+.undo-redo {
+  display: inline-flex;
+}
+
+.editor-toolbar .undo-redo button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.editor-toolbar .undo-redo button + button {
+  margin-left: -1px;
+  border-radius: 0 6px 6px 0;
 }
 
 .modal {
@@ -644,11 +686,45 @@ body {
 }
 
 .replay-chips {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.replay-chips summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.replay-chips-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.replay-chips-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+
+.replay-chips .chip {
+  font-size: 12px;
+  padding: 3px 9px;
+}
+
+/* A demo request already sent: still there to send again, but quieter. */
+.chip-used {
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 .chip:disabled {

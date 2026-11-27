@@ -28,15 +28,18 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
       <h2>{label}</h2>
-      {children}
-      {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} />}
-      {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
-      {rendered.status === "error" && (
-        <p className="slip-status" role="alert">
-          This slip couldn't be rendered: {rendered.message}
-        </p>
-      )}
-      {footer}
+      {/* Every pane has the same four rows (lined up across panes), so notes never push one slip below the other. */}
+      <div className="slip-pane-notes">{children}</div>
+      <div className="slip-pane-slip">
+        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} />}
+        {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
+        {rendered.status === "error" && (
+          <p className="slip-status" role="alert">
+            This slip couldn't be rendered: {rendered.message}
+          </p>
+        )}
+      </div>
+      <div className="slip-pane-footer">{footer}</div>
     </section>
   );
 }
