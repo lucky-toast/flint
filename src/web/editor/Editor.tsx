@@ -7,7 +7,7 @@ import { SelectionChip } from "../chat/SelectionChip";
 import { useSlipSelection } from "../selection/useSlipSelection";
 import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
-import { ItemChanges } from "./ItemChanges";
+import { ItemWarnings, useItemChanges, WhatChanged } from "./ItemChanges";
 import { OrderHint } from "./OrderHint";
 import { OrderPicker } from "./OrderPicker";
 import { CodeView, SlipCodeSwitch } from "./ShowCode";
@@ -50,6 +50,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   // On a narrow screen the seller can fold the original away so the working slip gets the room.
   const [originalHidden, setOriginalHidden] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // The item-change counter, run once per working template: its line goes on the Working heading.
+  const itemChanges = useItemChanges(session.state.original, workingSource(session.state), shop, uploads.assets);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
   const switchOrder = (id: string) => {
     // Another order may not have the part, so the selection clears.
@@ -112,6 +114,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           action={
             <>
               <SlipCodeSwitch shown={codeShown} onChange={setCodeShown} />
+              {itemChanges && <WhatChanged changes={itemChanges} />}
               {originalHidden && (
                 <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(false)}>
                   Show original
@@ -121,7 +124,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           }
           cover={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
         >
-          <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
+          {itemChanges && <ItemWarnings changes={itemChanges} />}
           <OrderHint
             original={session.state.original}
             working={workingSource(session.state)}

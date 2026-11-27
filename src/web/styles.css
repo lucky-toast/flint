@@ -88,8 +88,19 @@ body {
 
 .slip-pane-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 4px 10px;
+  margin-bottom: 8px;
+}
+
+.slip-pane-head h2 {
+  margin: 0;
+}
+
+.slip-pane-head .what-changed {
+  margin: 0;
+  font-size: 12px;
 }
 
 .pane-toggle {
