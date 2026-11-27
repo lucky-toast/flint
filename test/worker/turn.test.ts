@@ -337,9 +337,15 @@ Flint: ${"f".repeat(1000)}`);
   it("doesn't count the selection against the 500-character message cap", async () => {
     const calls = fakeEmber(sortEdit());
 
-    await turnJson({ message: "m".repeat(500), selection: "s".repeat(1500) });
+    await turnJson({ message: "m".repeat(500), selection: "s".repeat(MAX_SELECTION_LENGTH) });
 
-    expect(calls[0]!.body.input[0].content).toContain("s".repeat(1500));
+    expect(calls[0]!.body.input[0].content).toContain(`${"m".repeat(500)}
+
+${"s".repeat(MAX_SELECTION_LENGTH)}`);
+  });
+
+  it("caps a selection at 200 characters", () => {
+    expect(MAX_SELECTION_LENGTH).toBe(200);
   });
 
   it(`trims a selection over ${MAX_SELECTION_LENGTH} characters instead of refusing the turn`, async () => {

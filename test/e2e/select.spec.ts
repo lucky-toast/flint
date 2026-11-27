@@ -14,18 +14,12 @@ async function userMessage(script: { calls(): Promise<any[]> }): Promise<string>
   return call.input[0].content;
 }
 
-/** The code Flint was told the selection is, from the selection note in a user message. */
-function quotedCode(message: string): string {
-  const match = /The seller selected the "[^"]+" part of the slip\. In the template it is:\n```liquid\n([\s\S]*?)\n```/.exec(message);
+/** The selection note in a user message: the paragraph right after the request. */
+function selectionNoteOf(message: string): string {
+  const match = /\nRequest: [^\n]*\n\n(The seller selected [^\n]*)/.exec(message);
   if (!match) throw new Error(`no selection note in:\n${message.slice(-600)}`);
   return match[1]!;
 }
-
-function templateOf(message: string): string {
-  return /^Current template:\n```liquid\n([\s\S]*?)\n```/.exec(message)![1]!;
-}
-
-const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 const items = (slip: FrameLocator) => slip.locator("table.items");
 const skuCell = (slip: FrameLocator) => slip.locator("td.col-sku").first();
@@ -46,6 +40,8 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
   await expect(ed.selectionChip).toHaveText(/📍 About: Items/);
   await expect(ed.selectionTip).toHaveCount(0);
   await expect.poll(() => outline(items(ed.working))).toBe("solid");
+  // In the app's --selection colour, which the slip's own document doesn't have.
+  await expect.poll(() => items(ed.working).evaluate((el) => getComputedStyle(el).outlineColor)).toBe("rgb(232, 89, 12)");
   // Inside the selection, the boxes go one part finer.
   await skuCell(ed.working).hover();
   await expect(ed.nameTag).toHaveText("SKU column");
@@ -105,7 +101,7 @@ test("printing and downloading are unaffected by a selection", async ({ page }) 
   expect(source).not.toContain("data-flint");
 });
 
-test("a message sent with a selection carries its unique template code, and the bubble shows only a tag", async ({ page, ember }) => {
+test("a message sent with a selection carries its opening tag, and the bubble shows only a tag", async ({ page, ember }) => {
   const script = await ember.onRequest(
     "Make this bold (select)",
     editCall([{ find: ".col-sku { width: 20%;", replace: ".col-sku { font-weight: bold; width: 20%;" }], "Bold SKUs 💪"),
@@ -120,13 +116,10 @@ test("a message sent with a selection carries its unique template code, and the 
   await expect(ed.flintSays("Bold SKUs 💪")).toBeVisible();
 
   const message = await userMessage(script);
-  expect(message).toContain('Request: Make this bold (select)\n\nThe seller selected the "SKU column" part of the slip.');
-  expect(message).toContain("The template repeats it");
-  const code = quotedCode(message);
-  expect(code).toBe("        <td class=\"col-sku\">{{ item.sku | escape }}</td>");
-  expect(occurrences(templateOf(message), code)).toBe(1);
+  // The tag occurs once in the template, so no occurrence is given, and nothing comes from the rendered slip.
+  expect(selectionNoteOf(message)).toBe('The seller selected the "SKU column" part. In the template it\'s the opening tag `<td class="col-sku">`.');
   // The preview's instrumentation never reaches Flint.
-  expect(message).not.toContain("data-flint-line");
+  expect(message).not.toContain("data-flint");
 
   const bubble = ed.turn("Make this bold (select)").locator('[data-author="seller"]');
   await expect(bubble).toContainText("📍 SKU column");
@@ -134,7 +127,7 @@ test("a message sent with a selection carries its unique template code, and the 
   await expect(bubble).not.toContainText("item.sku");
 });
 
-test("of two look-alike sections, clicking the second sends code that matches only the second", async ({ page, ember }) => {
+test("of two look-alike sections, clicking the second sends its tag as occurrence 2 of 2", async ({ page, ember }) => {
   const returnTo = `  <section class="addresses">
     <div class="ship-to">
       <h2>Return to</h2>
@@ -158,15 +151,12 @@ test("of two look-alike sections, clicking the second sends code that matches on
   await ed.send("Make this smaller (look-alike)");
   await expect(ed.flintSays("Smaller now")).toBeVisible();
 
-  const message = await userMessage(second);
-  const code = quotedCode(message);
-  expect(occurrences(templateOf(message), code)).toBe(1);
-  expect(code).toBe(`  <section class="addresses">
-    <div class="ship-to">
-      <h2>Return to</h2>`);
+  expect(selectionNoteOf(await userMessage(second))).toBe(
+    'The seller selected the "Addresses" part. In the template it\'s the opening tag `<section class="addresses">`, occurrence 2 of 2 counting from the top.',
+  );
 });
 
-test("a part beside a different sibling on its line isn't told as repeated", async ({ page, ember }) => {
+test("of two parts on one template line, the clicked one's tag is sent", async ({ page, ember }) => {
   const badges = `  <p class="badges"><span class="badge-eco">Eco</span><span class="badge-local">Local</span></p>
 
   {% assign items`;
@@ -183,12 +173,12 @@ test("a part beside a different sibling on its line isn't told as repeated", asy
   await ed.send("Make this green (siblings)");
   await expect(ed.flintSays("Green it is")).toBeVisible();
 
-  const message = await userMessage(second);
-  expect(message).toContain('The seller selected the "Badge eco" part');
-  expect(message).not.toContain("The template repeats it");
+  expect(selectionNoteOf(await userMessage(second))).toBe(
+    'The seller selected the "Badge eco" part. In the template it\'s the opening tag `<span class="badge-eco">`.',
+  );
 });
 
-test("the selection survives a clarification, clears after an edit and on an order switch, and Undo leaves it", async ({ page, ember }) => {
+test("the selection survives a clarification, clears after an edit and on an order switch, and Undo and Redo clear it", async ({ page, ember }) => {
   await ember.onRequest("Change this (lifetime)", askCall("Bigger or bolder?", ["Bigger (lifetime)", "Bolder (lifetime)"]));
   const answer = await ember.onRequest(
     "Bolder (lifetime)",
@@ -218,16 +208,19 @@ test("the selection survives a clarification, clears after an edit and on an ord
   expect(history).toContain('Seller: Bolder (lifetime)\nThe seller selected the "Thank you" part');
   expect(history).not.toContain("Request: Now make it red (lifetime)\n\nThe seller selected");
 
-  // Undo leaves the current selection alone.
+  // Undo and Redo re-render the slip, so each clears the selection.
   await ed.working.locator(".thank-you").click();
   await expect(ed.selectionChip).toHaveText(/Thank you/);
   await ed.undoButton.click();
-  await expect(ed.working.locator(".thank-you")).toBeVisible();
+  await expect(ed.selectionChip).toHaveCount(0);
+  await ed.working.locator(".thank-you").click();
   await expect(ed.selectionChip).toHaveText(/Thank you/);
   await ed.redoButton.click();
-  await expect(ed.selectionChip).toHaveText(/Thank you/);
+  await expect(ed.selectionChip).toHaveCount(0);
 
   // Switching the example order clears it.
+  await ed.working.locator(".thank-you").click();
+  await expect(ed.selectionChip).toHaveText(/Thank you/);
   await ed.orderPicker.selectOption({ label: "#1002 · Gift order" });
   await expect(ed.selectionChip).toHaveCount(0);
 });

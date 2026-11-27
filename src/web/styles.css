@@ -5,6 +5,8 @@
   --line: #ddd5ce;
   --muted: #6b5f57;
   --accent: #b5532f;
+  /* Pointing at the working slip: the chip, and the boxes and name tag inside the slip. */
+  --selection: #e8590c;
 }
 
 body {
@@ -1061,7 +1063,7 @@ summary:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 3px 4px 3px 10px;
-  border: 1px solid #e8590c;
+  border: 1px solid var(--selection);
   border-radius: 999px;
   background: #fff1e8;
   color: #8a3305;
@@ -1080,7 +1082,7 @@ summary:focus-visible {
 }
 
 .selection-chip .selection-bigger {
-  border: 1px solid #e8590c;
+  border: 1px solid var(--selection);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 11px;

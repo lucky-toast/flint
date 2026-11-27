@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { quoteLineNear, selectionNote, uniqueQuote, type SelectedPart } from "../../core";
+import { selectionNote, type SelectedPart } from "../../core";
 import type { TurnSelection } from "../session/session";
-import { partAbove, partInside, partLine, partName, partsInside, renderedFrom, sameCode, sections, slipRoot, UI_ATTRIBUTE } from "./parts";
+import { partAbove, partInside, partName, partPlace, partsInside, renderedFrom, slipRoot, UI_ATTRIBUTE } from "./parts";
 
 // Pointing at the working slip. The working slip renders an instrumented copy of the template
-// (every opening tag carries its source line), and this hook listens to its same-origin preview
+// (every opening tag carries its source line and its position on that line), and this hook listens to its same-origin preview
 // document from the app, the way link-blocking does: the slip's sandbox and CSP are unchanged, so
 // nothing runs inside it. Hover boxes, the name tag and the selected outline are styles and one
 // element injected into the preview document only, for the screen, never for print.
 
 /**
- * The selection, by where it comes from in the template (its source is moved along on Undo and
- * Redo): its tag, and which of the elements rendered from its line with that tag it is.
+ * The selection, by where it comes from in the template (its opening tag's line and position), and
+ * which of the elements rendered from that tag it is, for the outline when the template repeats it.
  */
-type SelectedPartRef = SelectedPart & { tag: string; index: number };
+type SelectedPartRef = SelectedPart & { index: number };
 
 const PICKABLE = "data-flint-pickable";
 const HOVER = "data-flint-hover";
@@ -22,30 +22,34 @@ const SELECTED = "data-flint-selected";
 const ECHO = "data-flint-echo";
 const POINTING = "data-flint-pointing";
 
-const ACCENT = "#e8590c";
-const FRAME_STYLE = `
+/**
+ * The styles injected into the slip. Their colour is the app's --selection token (styles.css), read
+ * from the app's document and passed in, since the slip is a document of its own.
+ */
+const frameStyle = (accent: string) => `
 @media screen {
-  body[${POINTING}] [${PICKABLE}] { outline: 1px dashed rgb(232 89 12 / 0.45); outline-offset: 2px; }
-  [${HOVER}] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
-  [${SELECTED}] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.1) !important; }
-  [${ECHO}] { outline: 1px solid rgb(232 89 12 / 0.6) !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.05) !important; }
-  [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: ${ACCENT}; color: #fff;
+  :root { --flint-selection: ${accent}; }
+  body[${POINTING}] [${PICKABLE}] { outline: 1px dashed color-mix(in srgb, var(--flint-selection) 45%, transparent); outline-offset: 2px; }
+  [${HOVER}] { outline: 2px dashed var(--flint-selection) !important; outline-offset: 2px; cursor: pointer; }
+  [${SELECTED}] { outline: 2px solid var(--flint-selection) !important; outline-offset: 2px;
+    background-color: color-mix(in srgb, var(--flint-selection) 10%, transparent) !important; }
+  [${ECHO}] { outline: 1px solid color-mix(in srgb, var(--flint-selection) 60%, transparent) !important; outline-offset: 2px;
+    background-color: color-mix(in srgb, var(--flint-selection) 5%, transparent) !important; }
+  [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: var(--flint-selection); color: #fff;
     font: 600 15px/1 system-ui, sans-serif; padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 }
 @media print { [${UI_ATTRIBUTE}] { display: none !important; } }
 `;
 
-function elementOf(doc: Document, selectedPart: SelectedPartRef): Element | null {
-  const all = renderedFrom(doc, selectedPart.line, selectedPart.tag);
-  return all[selectedPart.index] ?? all[0] ?? null;
+/** Every element rendered from the same opening tag as `el` (each row's copy of a cell, say). */
+function copiesOf(el: Element): Element[] {
+  const place = partPlace(el);
+  return place ? renderedFrom(el.ownerDocument, place.line, place.position) : [el];
 }
 
-/** The selection's place in a new template, if its code is still there: the look-alike nearest its old line. */
-function moved(selectedPart: SelectedPartRef, source: string): SelectedPartRef | null {
-  if (selectedPart.source === source) return selectedPart;
-  const quote = uniqueQuote(selectedPart.source, selectedPart.line) ?? selectedPart.source.split("\n")[selectedPart.line - 1] ?? "";
-  const line = quote ? quoteLineNear(source, quote, selectedPart.line) : undefined;
-  return line === undefined ? null : { ...selectedPart, source, line };
+function elementOf(doc: Document, selectedPart: SelectedPartRef): Element | null {
+  const all = renderedFrom(doc, selectedPart.line, selectedPart.position);
+  return all[selectedPart.index] ?? all[0] ?? null;
 }
 
 function clearMark(doc: Document, attr: string) {
@@ -76,23 +80,22 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   /** The element under the cursor, so the hover box can follow a click without a mouse move. */
   const under = useRef<Element | null>(null);
 
-  // Undo, Redo and the like change the template without clearing the selection: follow its code.
+  // A new template (an accepted edit, Undo, Redo, Try again) re-renders the slip: the selection
+  // clears rather than point at code that has changed. It stays in the history Flint sees.
   useEffect(() => {
-    setSelectedPart((current) => (current ? moved(current, source) : current));
+    setSelectedPart((current) => (current && current.source !== source ? null : current));
   }, [source]);
 
   const clear = useCallback(() => setSelectedPart(null), []);
 
   const selectPart = useCallback((el: Element) => {
-    const line = partLine(el);
-    if (!line) return;
+    const place = partPlace(el);
+    if (!place) return;
     setSelectedPart({
       source: sourceRef.current,
-      line,
-      tag: el.tagName,
-      index: renderedFrom(el.ownerDocument, line, el.tagName).indexOf(el),
+      ...place,
+      index: renderedFrom(el.ownerDocument, place.line, place.position).indexOf(el),
       name: partName(el),
-      repeats: sameCode(el).length > 1,
     });
   }, []);
 
@@ -135,7 +138,7 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   const onDocument = useCallback(
     (d: Document) => {
       const style = d.createElement("style");
-      style.textContent = FRAME_STYLE;
+      style.textContent = frameStyle(getComputedStyle(document.documentElement).getPropertyValue("--selection").trim());
       // In the body, after the slip, so the head keeps only the page setup.
       d.body.appendChild(style);
       const tag = d.createElement("div");
@@ -180,8 +183,9 @@ export function useSlipSelection(source: string): SlipSelectionApi {
     clearMark(doc, ECHO);
     clearMark(doc, PICKABLE);
     selected?.setAttribute(SELECTED, "");
-    if (selected) for (const copy of sameCode(selected)) if (copy !== selected) copy.setAttribute(ECHO, "");
-    const pickable = root ? [...sections(root), ...(selected ? partsInside(selected) : [])] : [];
+    if (selected) for (const copy of copiesOf(selected)) if (copy !== selected) copy.setAttribute(ECHO, "");
+    // The parts inside the root are the sections.
+    const pickable = root ? [...partsInside(root), ...(selected ? partsInside(selected) : [])] : [];
     for (const el of pickable) el.setAttribute(PICKABLE, "");
     showHover(doc);
   }, [doc, selected, root, showHover]);
@@ -196,6 +200,6 @@ export function useSlipSelection(source: string): SlipSelectionApi {
     [selectedPart],
   );
 
-  const copies = selected ? sameCode(selected).length : 0;
+  const copies = selected ? copiesOf(selected).length : 0;
   return { selection, copies, canSelectBigger: !!bigger, selectBigger, clear, onDocument };
 }

@@ -18,10 +18,11 @@ type Props = {
   /** Shown over the slip, in the desk's place (e.g. the template code); the slip stays loaded beneath for print and pointing. */
   cover?: ReactNode;
   /**
-   * For pointing at parts: render a preview-only copy of the template whose tags carry their
-   * source lines, and hand each loaded slip document to this callback.
+   * Pointing at parts (the working slip only). When given, the pane renders the preview-only copy
+   * of the template whose tags carry where they are in the source, and hands each loaded slip
+   * document to `onDocument`. Without it, the slip renders as it is and nothing listens to it.
    */
-  onDocument?: (doc: Document) => void;
+  pointing?: { onDocument: (doc: Document) => void };
   /** A small control beside the heading (e.g. hide or show the original). */
   action?: ReactNode;
   /** Zoom on the desk, shared by both panes so they stay comparable. */
@@ -32,8 +33,8 @@ type Props = {
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, cover, onDocument, glowOnChange, action, zoom, onZoom }: Props) {
-  const rendered = useRenderedSlip(source, shop, order, assets, { instrument: !!onDocument });
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, cover, pointing, glowOnChange, action, zoom, onZoom }: Props) {
+  const rendered = useRenderedSlip(source, shop, order, assets, { instrument: pointing !== undefined });
   const glow = useChangeCount(source);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
@@ -45,7 +46,18 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
         {cover && <div className="slip-pane-cover">{cover}</div>}
-        {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} glow={glowOnChange ? glow : 0} desk zoom={zoom} onZoom={onZoom} />}
+        {rendered.status === "ok" && (
+          <SlipPreview
+            title={`${label} slip`}
+            html={rendered.html}
+            paper={paper}
+            onDocument={pointing?.onDocument}
+            glow={glowOnChange ? glow : 0}
+            desk
+            zoom={zoom}
+            onZoom={onZoom}
+          />
+        )}
         {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
         {rendered.status === "error" && (
           <p className="slip-status" role="alert">

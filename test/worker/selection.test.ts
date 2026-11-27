@@ -1,98 +1,81 @@
 import { describe, expect, it } from "vitest";
-import { LINE_ATTRIBUTE, MAX_SELECTION_LENGTH, instrumentSource, quoteLineNear, selectionNote } from "../../src/core";
+import { LINE_ATTRIBUTE, MAX_SELECTION_LENGTH, POSITION_ATTRIBUTE, instrumentSource, selectionNote } from "../../src/core";
 
-// What Flint is told about a selection: the part's name and its template code, made unique.
+// What Flint is told about a selection: the part's name and its opening tag from the template,
+// with which occurrence of that tag it is when the tag isn't unique.
 
 const source = [
-  "<div class=\"slip\">",
-  "  <section class=\"addresses\">",
-  "    <div class=\"ship-to\">",
+  '<div class="slip">',
+  '  <section class="addresses">',
+  '    <div class="ship-to">',
   "      <h2>Ship to</h2>",
   "    </div>",
   "  </section>",
-  "  <section class=\"addresses\">",
-  "    <div class=\"ship-to\">",
+  '  <section class="addresses">',
+  '    <div class="ship-to">',
   "      <h2>Return to</h2>",
   "    </div>",
   "  </section>",
+  '  <table><tr><td class="{{ col }}">a</td><td class="{{ col }}">b</td></tr></table>',
   "</div>",
 ].join("\n");
 
-const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
-
-/** The code block in a note. */
-const quoteOf = (note: string) => /```liquid\n([\s\S]*?)\n```/.exec(note)?.[1];
-
 describe("selectionNote", () => {
-  it("quotes a unique line as it is, with the part's name", () => {
-    const note = selectionNote({ source, line: 1, name: "Slip" });
-
-    expect(note).toBe('The seller selected the "Slip" part of the slip. In the template it is:\n```liquid\n<div class="slip">\n```');
+  it("names the part and quotes its opening tag, with no occurrence when the tag is unique", () => {
+    expect(selectionNote({ source, line: 1, position: 0, name: "Slip" })).toBe(
+      'The seller selected the "Slip" part. In the template it\'s the opening tag `<div class="slip">`.',
+    );
   });
 
-  it("extends a look-alike line until the quote occurs once", () => {
-    const first = quoteOf(selectionNote({ source, line: 3, name: "Ship to" }))!;
-    const second = quoteOf(selectionNote({ source, line: 8, name: "Ship to" }))!;
-
-    expect(first).toBe('    <div class="ship-to">\n      <h2>Ship to</h2>');
-    expect(second).toBe('    <div class="ship-to">\n      <h2>Return to</h2>');
-    expect(occurrences(source, first)).toBe(1);
-    expect(occurrences(source, second)).toBe(1);
+  it("says which occurrence of a repeated tag it is, counting from the top", () => {
+    expect(selectionNote({ source, line: 3, position: 0, name: "Ship to" })).toBe(
+      'The seller selected the "Ship to" part. In the template it\'s the opening tag `<div class="ship-to">`, occurrence 1 of 2 counting from the top.',
+    );
+    expect(selectionNote({ source, line: 8, position: 0, name: "Ship to" })).toContain(
+      '`<div class="ship-to">`, occurrence 2 of 2 counting from the top.',
+    );
   });
 
-  it("says when the template repeats the part on the slip", () => {
-    expect(selectionNote({ source, line: 1, name: "Slip", repeats: true })).toContain("appears more than once on the slip");
+  it("picks the clicked tag by its position on the line and keeps its Liquid", () => {
+    expect(selectionNote({ source, line: 12, position: 3, name: "Col column" })).toContain(
+      '`<td class="{{ col }}">`, occurrence 2 of 2 counting from the top.',
+    );
   });
 
-  it("falls back to the line and which occurrence it is when no unique quote fits", () => {
-    const same = Array.from({ length: 3 }, () => ['<p class="note">', "x".repeat(MAX_SELECTION_LENGTH), "</p>"].join("\n"));
-    const repeated = same.join("\n");
+  it("copies a tag that spans lines, past a > inside Liquid or quotes", () => {
+    const multi = ['<p class="note"', '   title="a > b" data-x="{{ x > 1 }}">', "</p>"].join("\n");
 
-    const note = selectionNote({ source: repeated, line: 4, name: "Note" });
-
-    expect(note.length).toBeLessThanOrEqual(MAX_SELECTION_LENGTH);
-    expect(quoteOf(note)).toBe('<p class="note">');
-    expect(note).toContain("occurs 3 times in the template; the seller means occurrence 2");
+    expect(selectionNote({ source: multi, line: 1, position: 0, name: "Note" })).toContain(
+      '`<p class="note"\n   title="a > b" data-x="{{ x > 1 }}">`.',
+    );
   });
 
-  it("counts the occurrences of the quote it sends when the line is too long to quote whole", () => {
-    const prefix = '<p class="note">';
-    const lookAlike = prefix + "x".repeat(MAX_SELECTION_LENGTH + 500) + "y";
-    const line = prefix + "x".repeat(MAX_SELECTION_LENGTH + 1000);
+  it(`fits in ${MAX_SELECTION_LENGTH} characters, counting the occurrence on the trimmed tag`, () => {
+    const prefix = '<p class="note" title="';
+    const lookAlike = `${prefix}${"x".repeat(300)}y">`;
+    const line = `${prefix}${"x".repeat(400)}">`;
     const long = [lookAlike, line, line].join("\n");
 
-    const note = selectionNote({ source: long, line: 2, name: "Note" });
+    const note = selectionNote({ source: long, line: 2, position: 0, name: "Note" });
 
-    const quote = quoteOf(note)!;
     expect(note.length).toBeLessThanOrEqual(MAX_SELECTION_LENGTH);
+    const quote = /the opening tag that starts `([^`]*)`/.exec(note)![1]!;
     expect(line.startsWith(quote) && lookAlike.startsWith(quote)).toBe(true);
-    expect(note).toContain("occurs 3 times in the template; the seller means occurrence 2");
+    expect(note).toContain("occurrence 2 of 3 counting from the top.");
   });
 });
 
 describe("instrumentSource", () => {
-  it("marks each opening tag with its line but leaves Liquid markup alone", () => {
-    const liquid = ['<div class="slip">', '  {% if a<b %}<b>yes</b>{% endif %}', '  <p>{{ "<b>hi</b>" }}</p>'].join("\n");
+  it("marks each opening tag with its line and position on the line, but leaves Liquid markup alone", () => {
+    const liquid = ['<div class="slip">', '  {% if a<b %}<b>yes</b><i>!</i>{% endif %}', '  <p>{{ "<b>hi</b>" }}</p>'].join("\n");
+    const at = (line: number, position: number) => `${LINE_ATTRIBUTE}="${line}" ${POSITION_ATTRIBUTE}="${position}"`;
 
     expect(instrumentSource(liquid)).toBe(
       [
-        `<div ${LINE_ATTRIBUTE}="1" class="slip">`,
-        `  {% if a<b %}<b ${LINE_ATTRIBUTE}="2">yes</b>{% endif %}`,
-        `  <p ${LINE_ATTRIBUTE}="3">{{ "<b>hi</b>" }}</p>`,
+        `<div ${at(1, 0)} class="slip">`,
+        `  {% if a<b %}<b ${at(2, 0)}>yes</b><i ${at(2, 1)}>!</i>{% endif %}`,
+        `  <p ${at(3, 0)}>{{ "<b>hi</b>" }}</p>`,
       ].join("\n"),
     );
-  });
-});
-
-describe("quoteLineNear", () => {
-  const twice = ["<div>", '  <p class="a">', "</div>", "<div>", '  <p class="a">', "</div>"].join("\n");
-
-  it("finds the occurrence of the quote closest to the line it was on", () => {
-    expect(quoteLineNear(twice, '  <p class="a">', 2)).toBe(2);
-    expect(quoteLineNear(twice, '  <p class="a">', 4)).toBe(5);
-  });
-
-  it("is undefined when the quote is gone", () => {
-    expect(quoteLineNear(twice, '<p class="b">', 2)).toBeUndefined();
   });
 });
