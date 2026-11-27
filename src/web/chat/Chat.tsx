@@ -87,6 +87,7 @@ export function Chat({
           disabled={thinking}
           onChoose={onSend}
           used={new Set(turns.filter((t) => !t.undone).map((t) => t.message))}
+          turnCount={turns.length}
         />
       )}
       {redoPending && <p className="redo-warning">Your next message clears Redo.</p>}

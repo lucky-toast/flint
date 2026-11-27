@@ -92,6 +92,35 @@ body {
   color: var(--muted);
 }
 
+/* The working slip glows for a moment after each change. */
+.slip-pane-slip {
+  position: relative;
+}
+
+.slip-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: slip-glow 1.4s ease-out forwards;
+}
+
+@keyframes slip-glow {
+  0% {
+    box-shadow: 0 0 0 3px rgb(181 83 47 / 0.75), 0 0 24px rgb(181 83 47 / 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgb(181 83 47 / 0), 0 0 24px rgb(181 83 47 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slip-glow {
+    animation: none;
+  }
+}
+
 .slip-status {
   color: var(--muted);
 }
@@ -799,6 +828,10 @@ summary:focus-visible {
   background: #fff1e8;
   color: #8a3305;
   font-size: 13px;
+}
+
+.selection-copies {
+  color: #b5622f;
 }
 
 .selection-chip button {

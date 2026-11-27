@@ -18,6 +18,8 @@ type SelectedPartRef = SelectedPart & { tag: string; index: number };
 const PICKABLE = "data-flint-pickable";
 const HOVER = "data-flint-hover";
 const SELECTED = "data-flint-selected";
+/** The other copies of a repeated selected part (every row's cell, say): an edit to its code changes them all. */
+const ECHO = "data-flint-echo";
 const POINTING = "data-flint-pointing";
 
 const ACCENT = "#e8590c";
@@ -25,7 +27,8 @@ const FRAME_STYLE = `
 @media screen {
   body[${POINTING}] [${PICKABLE}] { outline: 1px dashed rgb(232 89 12 / 0.45); outline-offset: 2px; }
   [${HOVER}] { outline: 2px dashed ${ACCENT} !important; outline-offset: 2px; cursor: pointer; }
-  [${SELECTED}] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.07) !important; }
+  [${SELECTED}] { outline: 2px solid ${ACCENT} !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.1) !important; }
+  [${ECHO}] { outline: 1px solid rgb(232 89 12 / 0.6) !important; outline-offset: 2px; background-color: rgb(232 89 12 / 0.05) !important; }
   [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: ${ACCENT}; color: #fff;
     font: 600 15px/1 system-ui, sans-serif; padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 }
@@ -52,6 +55,8 @@ function clearMark(doc: Document, attr: string) {
 export type SlipSelectionApi = {
   /** What's selected, as it goes with the next message. */
   selection: TurnSelection | undefined;
+  /** How many times the selected part shows on this slip (every row's cell, say); 0 when nothing is selected. */
+  copies: number;
   /** Whether Select bigger has a part to go to. */
   canSelectBigger: boolean;
   selectBigger: () => void;
@@ -165,12 +170,14 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   const selected = doc && selectedPart ? elementOf(doc, selectedPart) : null;
   const root = doc ? slipRoot(doc) : null;
 
-  // Mark the selection and what can be selected now: the sections, and the parts one level inside the selection.
+  // Mark the selection (and its repeats) and what can be selected now: the sections, and the parts one level inside the selection.
   useEffect(() => {
     if (!doc) return;
     clearMark(doc, SELECTED);
+    clearMark(doc, ECHO);
     clearMark(doc, PICKABLE);
     selected?.setAttribute(SELECTED, "");
+    if (selected) for (const copy of sameCode(selected)) if (copy !== selected) copy.setAttribute(ECHO, "");
     const pickable = root ? [...sections(root), ...(selected ? partsInside(selected) : [])] : [];
     for (const el of pickable) el.setAttribute(PICKABLE, "");
     showHover(doc);
@@ -186,5 +193,6 @@ export function useSlipSelection(source: string): SlipSelectionApi {
     [selectedPart],
   );
 
-  return { selection, canSelectBigger: !!bigger, selectBigger, clear, onDocument };
+  const copies = selected ? sameCode(selected).length : 0;
+  return { selection, copies, canSelectBigger: !!bigger, selectBigger, clear, onDocument };
 }

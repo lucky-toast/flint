@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Order, Paper, Shop } from "../../core";
 import { SlipPreview } from "../SlipPreview";
 import { useRenderedSlip } from "./useRenderedSlip";
@@ -20,17 +20,21 @@ type Props = {
    * source lines, and hand each loaded slip document to this callback.
    */
   onDocument?: (doc: Document) => void;
+  /** Glow briefly whenever the source changes after the first render, so the eye goes to the new slip. */
+  glowOnChange?: boolean;
 };
 
 /** One editor pane: a heading and the slip rendered for the chosen example order. */
-export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument }: Props) {
+export function SlipPane({ label, source, shop, order, paper, assets, children, footer, onDocument, glowOnChange }: Props) {
   const rendered = useRenderedSlip(source, shop, order, assets, { instrument: !!onDocument });
+  const glow = useChangeCount(source);
   return (
     <section className="slip-pane" aria-label={`${label} slip`}>
       <h2>{label}</h2>
       {/* Every pane has the same four rows (lined up across panes), so notes never push one slip below the other. */}
       <div className="slip-pane-notes">{children}</div>
       <div className="slip-pane-slip">
+        {glowOnChange && glow > 0 && <div key={glow} className="slip-glow" aria-hidden="true" />}
         {rendered.status === "ok" && <SlipPreview title={`${label} slip`} html={rendered.html} paper={paper} onDocument={onDocument} />}
         {rendered.status === "rendering" && <p className="slip-status">Rendering…</p>}
         {rendered.status === "error" && (
@@ -42,4 +46,17 @@ export function SlipPane({ label, source, shop, order, paper, assets, children, 
       <div className="slip-pane-footer">{footer}</div>
     </section>
   );
+}
+
+/** Counts how many times `value` has changed since the first render. */
+function useChangeCount(value: string) {
+  const first = useRef(value);
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (value !== first.current) {
+      first.current = value;
+      setCount((c) => c + 1);
+    }
+  }, [value]);
+  return count;
 }

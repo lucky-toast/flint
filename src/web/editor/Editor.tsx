@@ -96,6 +96,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           paper={template.paper}
           assets={uploads.assets}
           onDocument={slipSelection.onDocument}
+          glowOnChange
           footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
         >
           <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
@@ -121,6 +122,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         selectionChip={
           <SelectionChip
             name={slipSelection.selection?.name}
+            copies={slipSelection.copies}
             canSelectBigger={slipSelection.canSelectBigger}
             onSelectBigger={slipSelection.selectBigger}
             onClear={slipSelection.clear}

@@ -52,6 +52,10 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
 
   await skuCell(ed.working).click();
   await expect(ed.selectionChip).toHaveText(/📍 About: SKU column/);
+  // A part repeated on every row says so, and its other copies are boxed too: an edit reaches them all.
+  const skuCells = await ed.working.locator("td.col-sku").count();
+  await expect(ed.selectionChip).toContainText(`all ${skuCells}`);
+  await expect(ed.working.locator("td.col-sku[data-flint-echo]")).toHaveCount(skuCells - 1);
 
   await ed.selectBiggerButton.click();
   await expect(ed.selectionChip).toHaveText(/📍 About: Items/);
