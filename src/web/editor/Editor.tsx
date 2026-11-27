@@ -60,7 +60,7 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   };
 
   return (
-    <div className="editor">
+    <div className={originalHidden ? "editor editor-original-hidden" : "editor"}>
       <div className="editor-toolbar">
         <SlipActions
           shop={shop}

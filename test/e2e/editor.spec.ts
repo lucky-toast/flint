@@ -81,6 +81,22 @@ test("the example order picker sits on the Original heading and hides with the o
   await expect(originalPane.getByLabel("Example order")).toHaveValue("kiln-1002");
 });
 
+test("hiding the original widens the chat to fill the room, keeping the usual gap from the working slip", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const chat = page.locator(".chat");
+  const working = page.getByRole("region", { name: "Working slip" });
+  const before = (await chat.boundingBox())!;
+
+  await page.getByRole("button", { name: "Hide original" }).click();
+
+  await expect.poll(async () => (await chat.boundingBox())!.width).toBeGreaterThan(before.width);
+  const after = (await chat.boundingBox())!;
+  const slip = (await working.boundingBox())!;
+  expect(after.x + after.width).toBeCloseTo(before.x + before.width, 0);
+  expect(after.x - (slip.x + slip.width)).toBeCloseTo(16, 0);
+});
+
 test("Flint is thinking from send until the reply arrives", async ({ page, ember }) => {
   await ember.script(
     { delayMs: 1500 },

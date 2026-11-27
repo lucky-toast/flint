@@ -47,6 +47,11 @@ body {
   align-items: start;
 }
 
+/* With the original hidden, the working slip keeps its size and the chat takes the rest of the row. */
+.editor-original-hidden {
+  grid-template-columns: minmax(0, 720px) minmax(360px, 1fr);
+}
+
 .editor-toolbar {
   grid-area: toolbar;
   display: flex;
