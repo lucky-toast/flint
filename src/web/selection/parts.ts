@@ -1,7 +1,8 @@
 import { LINE_ATTRIBUTE, POSITION_ATTRIBUTE } from "../../core";
 
 // Finding parts in the working slip's preview document. A part is an element with a class; a
-// section is a part directly inside the slip's root. Unnamed elements (like table rows) are never
+// section is one of the outermost parts inside the slip's root (usually its direct children, but an
+// unclassed wrapper is looked through). Unnamed elements (like table rows) are never
 // selectable, so anything finer than a part is described in words.
 
 /** Words kept upper-case in part names ("SKU column"). */

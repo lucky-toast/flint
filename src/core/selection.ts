@@ -102,23 +102,24 @@ const MAX_NAME_LENGTH = 40;
  * on the trimmed text, so it stays accurate for what's sent.
  */
 export function selectionNote({ source, line, position, name }: SelectedPart): string {
-  const intro = `The seller selected the "${name.slice(0, MAX_NAME_LENGTH)}" part.`;
+  const selected = `Selected "${name.slice(0, MAX_NAME_LENGTH)}"`;
   const tag = openingTagAt(source, line, position);
-  if (!tag) return intro;
+  if (!tag) return `${selected}.`;
 
-  const note = (quote: string, trimmed: boolean) => {
+  // "Opening with" stays true for a trimmed tag, so every note has the same shape.
+  const note = (quote: string) => {
     const total = countOccurrences(source, quote);
     const which = countOccurrences(source.slice(0, tag.start + quote.length), quote);
-    const occurrence = total > 1 ? `, occurrence ${which} of ${total} counting from the top` : "";
-    return `${intro} In the template it's the opening tag ${trimmed ? "that starts " : ""}\`${quote}\`${occurrence}.`;
+    const where = total > 1 ? `(occurrence ${which} of ${total} in the template)` : "in the template";
+    return `${selected}, the element opening with \`${quote}\` ${where}.`;
   };
 
   let quote = source.slice(tag.start, tag.end);
-  let text = note(quote, false);
+  let text = note(quote);
   // Trim until it fits. A shorter quote can occur more often, so its counts are taken again each time.
   while (text.length > MAX_SELECTION_LENGTH && quote.length > 1) {
     quote = quote.slice(0, Math.max(1, quote.length - (text.length - MAX_SELECTION_LENGTH)));
-    text = note(quote, true);
+    text = note(quote);
   }
   return text.slice(0, MAX_SELECTION_LENGTH);
 }

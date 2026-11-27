@@ -23,22 +23,22 @@ const source = [
 describe("selectionNote", () => {
   it("names the part and quotes its opening tag, with no occurrence when the tag is unique", () => {
     expect(selectionNote({ source, line: 1, position: 0, name: "Slip" })).toBe(
-      'The seller selected the "Slip" part. In the template it\'s the opening tag `<div class="slip">`.',
+      'Selected "Slip", the element opening with `<div class="slip">` in the template.',
     );
   });
 
-  it("says which occurrence of a repeated tag it is, counting from the top", () => {
+  it("says which occurrence of a repeated tag it is", () => {
     expect(selectionNote({ source, line: 3, position: 0, name: "Ship to" })).toBe(
-      'The seller selected the "Ship to" part. In the template it\'s the opening tag `<div class="ship-to">`, occurrence 1 of 2 counting from the top.',
+      'Selected "Ship to", the element opening with `<div class="ship-to">` (occurrence 1 of 2 in the template).',
     );
     expect(selectionNote({ source, line: 8, position: 0, name: "Ship to" })).toContain(
-      '`<div class="ship-to">`, occurrence 2 of 2 counting from the top.',
+      '`<div class="ship-to">` (occurrence 2 of 2 in the template).',
     );
   });
 
   it("picks the clicked tag by its position on the line and keeps its Liquid", () => {
     expect(selectionNote({ source, line: 12, position: 3, name: "Col column" })).toContain(
-      '`<td class="{{ col }}">`, occurrence 2 of 2 counting from the top.',
+      '`<td class="{{ col }}">` (occurrence 2 of 2 in the template).',
     );
   });
 
@@ -46,7 +46,7 @@ describe("selectionNote", () => {
     const multi = ['<p class="note"', '   title="a > b" data-x="{{ x > 1 }}">', "</p>"].join("\n");
 
     expect(selectionNote({ source: multi, line: 1, position: 0, name: "Note" })).toContain(
-      '`<p class="note"\n   title="a > b" data-x="{{ x > 1 }}">`.',
+      '`<p class="note"\n   title="a > b" data-x="{{ x > 1 }}">` in the template.',
     );
   });
 
@@ -59,9 +59,9 @@ describe("selectionNote", () => {
     const note = selectionNote({ source: long, line: 2, position: 0, name: "Note" });
 
     expect(note.length).toBeLessThanOrEqual(MAX_SELECTION_LENGTH);
-    const quote = /the opening tag that starts `([^`]*)`/.exec(note)![1]!;
+    const quote = /the element opening with `([^`]*)`/.exec(note)![1]!;
     expect(line.startsWith(quote) && lookAlike.startsWith(quote)).toBe(true);
-    expect(note).toContain("occurrence 2 of 3 counting from the top.");
+    expect(note).toContain("(occurrence 2 of 3 in the template).");
   });
 });
 
