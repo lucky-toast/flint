@@ -65,13 +65,15 @@ export function SlipPreview({ html, paper, title = "Slip preview", onDocument, g
   }, []);
 
   // On the desk, every paper uses the scale that fits the largest one, so a 4×6 label looks as much
-  // smaller than a Letter sheet as it really is; it sits centred. Without the desk, the sheet fills the width.
+  // smaller than a Letter sheet as it really is. Without the desk, the sheet fills the width.
   const scale = desk
     ? Math.min(1, (boxWidth - 2 * DESK_PADDING) / DESK_PAPER.width)
     : Math.min(1, boxWidth / width);
   const boxHeight = desk ? DESK_PAPER.height * scale + 2 * DESK_PADDING : height * scale;
-  const left = desk ? (boxWidth - width * scale) / 2 : 0;
-  const top = desk ? (boxHeight - height * scale) / 2 : 0;
+  // Every sheet sits at the desk's top-left corner, where a Letter sheet would, so the padding is even
+  // and a smaller sheet's size shows against the space it leaves.
+  const left = desk ? (boxWidth - DESK_PAPER.width * scale) / 2 : 0;
+  const top = desk ? DESK_PADDING : 0;
 
   return (
     <div ref={box} className={desk ? "slip-preview-box slip-desk" : "slip-preview-box"} style={{ height: boxHeight }}>
