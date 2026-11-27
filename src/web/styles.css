@@ -101,12 +101,11 @@ body {
 
 .slip-pane-head h2 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  /* The pane headings' original look (bold, muted, small, tracked), in title case. */
+  font-size: 13px;
   line-height: 28px;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #1f1b18;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 .slip-pane-head .what-changed {
