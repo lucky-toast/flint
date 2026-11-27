@@ -168,3 +168,18 @@ test("both previews are sized to the template's paper", async ({ page }) => {
     expect(box.width / box.height).toBeCloseTo(8.5 / 11, 2);
   }
 });
+
+test("zooming enlarges both slips together, and the level button fits them again", async ({ page }) => {
+  const ed = editor(page);
+  await page.goto("/");
+  const width = async (frame: typeof ed.workingFrame) => (await frame.boundingBox())!.width;
+  await expect(ed.workingFrame).toBeVisible();
+  const fitted = await width(ed.workingFrame);
+
+  await page.getByRole("group", { name: "Zoom Working slip" }).getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(() => width(ed.workingFrame)).toBeCloseTo(fitted * 1.5, 0);
+  await expect.poll(() => width(ed.originalFrame)).toBeCloseTo(fitted * 1.5, 0);
+
+  await page.getByRole("group", { name: "Zoom Original slip" }).getByTitle("Fit to the desk").click();
+  await expect.poll(() => width(ed.workingFrame)).toBeCloseTo(fitted, 0);
+});

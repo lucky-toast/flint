@@ -19,6 +19,8 @@ type Props = {
   replayChips?: string[];
   /** What the next message is about (the selection chip), shown just above the message box. */
   selectionChip?: ReactNode;
+  /** What's selected on the working slip, shown on the message box. */
+  selection?: { name: string; onClear: () => void };
 };
 
 /** The chat with Flint: the conversation so far, a thinking indicator, and the message box. */
@@ -32,6 +34,7 @@ export function Chat({
   redoPending,
   replayChips,
   selectionChip,
+  selection,
 }: Props) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -76,15 +79,28 @@ export function Chat({
         ))}
         {thinking && (
           <p className="thinking" role="status">
+            <span className="thinking-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
             Flint is thinking…
           </p>
         )}
         <div ref={end} />
       </div>
-      {replayChips && <ReplayChips requests={replayChips} disabled={thinking} onChoose={onSend} />}
+      {replayChips && (
+        <ReplayChips
+          requests={replayChips}
+          disabled={thinking}
+          onChoose={onSend}
+          used={new Set(turns.filter((t) => !t.undone).map((t) => t.message))}
+          turnCount={turns.length}
+        />
+      )}
       {redoPending && <p className="redo-warning">Your next message clears Redo.</p>}
       {selectionChip}
-      <Composer disabled={thinking} onSend={onSend} />
+      <Composer disabled={thinking} onSend={onSend} selection={selection} />
     </aside>
   );
 }

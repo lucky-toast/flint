@@ -20,14 +20,14 @@ export function editor(page: Page) {
     input,
     sendButton: page.getByRole("button", { name: "Send" }),
     thinking: page.getByText("Flint is thinking…"),
-    undoButton: page.getByRole("button", { name: "Undo" }),
-    redoButton: page.getByRole("button", { name: "Redo" }),
+    // Undo and Redo hide (with their pill) while there's nothing to undo or redo; they're still there, disabled.
+    undoButton: page.getByRole("button", { name: "Undo", includeHidden: true }),
+    redoButton: page.getByRole("button", { name: "Redo", includeHidden: true }),
     /** The line above the message box while Redo has something to reapply. */
     redoWarning: page.getByText("Your next message clears Redo."),
     tryAgainButton: chat.getByRole("button", { name: "Try again" }),
-    /** The chip above the message box naming what's selected on the working slip ("📍 About: …"). */
+    /** The strip on top of the message box naming what's selected on the working slip ("Selected: …"). */
     selectionChip: page.getByRole("status", { name: "Selection" }),
-    selectBiggerButton: page.getByRole("button", { name: "Select bigger" }),
     clearSelectionButton: page.getByRole("button", { name: "Clear selection" }),
     /** The tip above the message box while nothing is selected. */
     selectionTip: page.getByText("Tip: click part of the working slip to point at it."),

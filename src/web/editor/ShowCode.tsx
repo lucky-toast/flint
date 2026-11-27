@@ -1,27 +1,27 @@
-import { useId, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { codeDiff } from "./code-diff";
 
-type Props = { original: string; working: string };
-
 /**
- * A hidden-by-default "Show code" toggle for curious sellers: the working template's Liquid and
- * a line diff against the original. The chat itself never shows code.
+ * Slip / Code, on the Working pane's heading: Code shows the working template in place of the slip,
+ * for curious sellers. The chat itself never shows code.
  */
-export function ShowCode({ original, working }: Props) {
-  const [shown, setShown] = useState(false);
-  const id = useId();
+export function SlipCodeSwitch({ shown, onChange }: { shown: boolean; onChange: (shown: boolean) => void }) {
   return (
-    <div className="show-code">
-      <label className="show-code-toggle" htmlFor={id}>
-        <input id={id} type="checkbox" checked={shown} onChange={(e) => setShown(e.target.checked)} />
-        Show code
-      </label>
-      {shown && <CodeView original={original} working={working} />}
+    <div className="slip-code-switch" role="group" aria-label="Show the working slip or its code">
+      <button type="button" aria-pressed={!shown} onClick={() => onChange(false)}>
+        Slip
+      </button>
+      <button type="button" aria-pressed={shown} onClick={() => onChange(true)}>
+        Code
+      </button>
     </div>
   );
 }
 
-function CodeView({ original, working }: Props) {
+type Props = { original: string; working: string };
+
+/** The working template's Liquid and a line diff against the original. */
+export function CodeView({ original, working }: Props) {
   const rows = useMemo(() => codeDiff(original, working), [original, working]);
   return (
     <section className="code-view" aria-label="Template code">

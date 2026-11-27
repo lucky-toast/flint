@@ -18,6 +18,8 @@ type SelectedPartRef = SelectedPart & { index: number };
 const PICKABLE = "data-flint-pickable";
 const HOVER = "data-flint-hover";
 const SELECTED = "data-flint-selected";
+/** The other copies of a repeated selected part (every row's cell, say): an edit to its code changes them all. */
+const ECHO = "data-flint-echo";
 const POINTING = "data-flint-pointing";
 
 /**
@@ -30,12 +32,20 @@ const frameStyle = (accent: string) => `
   body[${POINTING}] [${PICKABLE}] { outline: 1px dashed color-mix(in srgb, var(--flint-selection) 45%, transparent); outline-offset: 2px; }
   [${HOVER}] { outline: 2px dashed var(--flint-selection) !important; outline-offset: 2px; cursor: pointer; }
   [${SELECTED}] { outline: 2px solid var(--flint-selection) !important; outline-offset: 2px;
-    background-color: color-mix(in srgb, var(--flint-selection) 7%, transparent) !important; }
+    background-color: color-mix(in srgb, var(--flint-selection) 10%, transparent) !important; }
+  [${ECHO}] { outline: 1px solid color-mix(in srgb, var(--flint-selection) 60%, transparent) !important; outline-offset: 2px;
+    background-color: color-mix(in srgb, var(--flint-selection) 5%, transparent) !important; }
   [${UI_ATTRIBUTE}] { position: absolute; z-index: 2147483647; margin: 0; background: var(--flint-selection); color: #fff;
     font: 600 15px/1 system-ui, sans-serif; padding: 5px 8px; border-radius: 4px 4px 0 0; pointer-events: none; white-space: nowrap; }
 }
 @media print { [${UI_ATTRIBUTE}] { display: none !important; } }
 `;
+
+/** Every element rendered from the same opening tag as `el` (each row's copy of a cell, say). */
+function copiesOf(el: Element): Element[] {
+  const place = partPlace(el);
+  return place ? renderedFrom(el.ownerDocument, place.line, place.position) : [el];
+}
 
 function elementOf(doc: Document, selectedPart: SelectedPartRef): Element | null {
   const all = renderedFrom(doc, selectedPart.line, selectedPart.position);
@@ -110,7 +120,10 @@ export function useSlipSelection(source: string): SlipSelectionApi {
       target.setAttribute(HOVER, "");
       const box = target.getBoundingClientRect();
       const view = d.defaultView!;
-      tag.textContent = partName(target);
+      // Clicking the selected part again clears it (nothing finer to drill into there), so the tag says so.
+      const current = selectedRef.current;
+      const isSelected = !!current && target === elementOf(d, current);
+      tag.textContent = isSelected ? `${partName(target)} · click to clear` : partName(target);
       tag.style.left = `${box.left + view.scrollX - 2}px`;
       tag.style.top = `${Math.max(0, box.top + view.scrollY - 26)}px`;
       tag.hidden = false;
@@ -161,12 +174,14 @@ export function useSlipSelection(source: string): SlipSelectionApi {
   const selected = doc && selectedPart ? elementOf(doc, selectedPart) : null;
   const root = doc ? slipRoot(doc) : null;
 
-  // Mark the selection and what can be selected now: the sections, and the parts one level inside the selection.
+  // Mark the selection (and its repeats) and what can be selected now: the sections, and the parts one level inside the selection.
   useEffect(() => {
     if (!doc) return;
     clearMark(doc, SELECTED);
+    clearMark(doc, ECHO);
     clearMark(doc, PICKABLE);
     selected?.setAttribute(SELECTED, "");
+    if (selected) for (const copy of copiesOf(selected)) if (copy !== selected) copy.setAttribute(ECHO, "");
     // The parts inside the root are the sections.
     const pickable = root ? [...partsInside(root), ...(selected ? partsInside(selected) : [])] : [];
     for (const el of pickable) el.setAttribute(PICKABLE, "");

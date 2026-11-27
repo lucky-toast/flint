@@ -15,7 +15,7 @@ body {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
   padding: 12px 24px;
   background: #fff;
@@ -68,20 +68,188 @@ body {
   padding: 4px 8px;
 }
 
+/* Each pane spans the same four rows (heading, notes, slip, footer) so the two slips stay level. */
 .editor-panes {
   grid-area: panes;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-rows: auto auto auto auto;
+  column-gap: 16px;
 }
 
-.slip-pane h2,
+.editor-panes-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* With the original folded away, the working slip stays a sensible size rather than filling the row. */
+.editor-panes-single .slip-pane {
+  max-width: 720px;
+}
+
+/* Both headings sit in a row of the same fixed height, centred, so "Original" and "Working" share one line
+   whatever controls sit beside them. */
+.slip-pane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 28px;
+  /* Close above the desk and in from its rounded edge, like a label on it. */
+  margin-bottom: 2px;
+  padding: 0 10px;
+}
+
+.slip-pane-head h2 {
+  margin: 0;
+  /* The pane headings' original look (bold, muted, small, tracked), in title case. */
+  font-size: 15px;
+  line-height: 28px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.slip-pane-head .what-changed {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pane-toggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pane-toggle:hover {
+  color: var(--accent);
+}
+
+.slip-pane {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
 .chat h2 {
   margin: 0 0 8px;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+/* The working slip glows for a moment after each change. */
+.slip-preview-box {
+  position: relative;
+}
+
+/* The editor's desk: a dark surface sized for the largest paper, so a 4×6 label reads as small. */
+.slip-desk {
+  border-radius: 8px;
+  background: #3a332e;
+  box-shadow: inset 0 1px 6px rgb(0 0 0 / 0.35);
+}
+
+.slip-desk .slip-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.45);
+}
+
+.slip-desk-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  border-radius: inherit;
+}
+
+.slip-desk-sizer {
+  position: relative;
+}
+
+/* Zoom buttons in the desk's bottom-right corner, across from the paper caption. */
+.slip-zoom {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgb(31 27 24 / 0.75);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  opacity: 0.7;
+  transition: opacity 150ms;
+}
+
+.slip-desk:hover .slip-zoom,
+.slip-zoom:focus-within {
+  opacity: 1;
+}
+
+.slip-zoom button {
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.slip-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.slip-zoom .slip-zoom-level {
+  min-width: 44px;
+  padding: 5px 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.slip-desk-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgb(255 255 255 / 0.55);
+  pointer-events: none;
+}
+
+.slip-glow {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: slip-glow 1.4s ease-out forwards;
+}
+
+@keyframes slip-glow {
+  /* Inset: the preview box clips anything outside the sheet. */
+  0% {
+    box-shadow: inset 0 0 0 3px rgb(181 83 47 / 0.8), inset 0 0 28px rgb(181 83 47 / 0.3);
+  }
+  100% {
+    box-shadow: inset 0 0 0 3px rgb(181 83 47 / 0), inset 0 0 28px rgb(181 83 47 / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slip-glow {
+    animation: none;
+  }
 }
 
 .slip-status {
@@ -151,7 +319,7 @@ body {
 
 /* While Redo has something to reapply, above the message box. */
 .redo-warning {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
@@ -221,10 +389,56 @@ body {
 }
 
 .thinking {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f4efea;
   font-size: 13px;
   color: var(--muted);
-  font-style: italic;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.3;
+  animation: thinking-dot 1.2s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .composer {
@@ -265,22 +479,64 @@ body {
   cursor: pointer;
 }
 
+.composer button:hover:not(:disabled) {
+  background: #9e4626;
+}
+
 .composer button:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.show-code {
-  margin-top: 8px;
+/* Slip / Code on the Working heading. */
+.slip-code-switch {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: #e2dbd4;
+}
+
+.slip-code-switch button {
+  border: none;
+  border-radius: 999px;
+  background: none;
+  padding: 2px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.slip-code-switch button[aria-pressed="true"] {
+  background: #fff;
+  color: #1f1b18;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+/* The code, in the desk's place over the working slip. */
+.slip-pane-slip {
+  position: relative;
+}
+
+.slip-pane-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: auto;
+  /* Room at the top for the Undo / Redo pill. */
+  padding: 40px 16px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.code-view {
   font-size: 13px;
 }
 
-.show-code-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  cursor: pointer;
+.slip-pane-cover .code-diff,
+.slip-pane-cover .code-source {
+  max-height: none;
 }
 
 .code-view h3 {
@@ -347,6 +603,36 @@ body {
   color: var(--muted);
 }
 
+/* The all-clear: every item and price still shows. A quiet check, not a notice to read. */
+.what-changed-ok {
+  font-size: 12px;
+  color: #4d7a5a;
+}
+
+.what-changed-ok::before {
+  content: "✓ ";
+}
+
+.order-hint {
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eef3fb;
+  border: 1px solid #c9d7ee;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.order-hint-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #2c5aa0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .item-warning {
   padding: 4px 8px;
   border-radius: 6px;
@@ -369,15 +655,9 @@ body {
   padding: 4px 8px;
 }
 
-.app-header-button {
+/* The mode badge and access code sit at the far right of the header. */
+.app-header .access {
   margin-left: auto;
-  font: inherit;
-  font-size: 14px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
 }
 
 .template-picker h2 {
@@ -434,8 +714,32 @@ body {
   color: var(--muted);
 }
 
+/* The thumbnail: the slip as a sheet of paper on a soft backdrop, centred. */
 .template-card-preview {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 6px;
+  background: #f4efea;
+}
+
+.template-card-preview .slip-preview-box {
+  max-width: 200px;
+}
+
+.template-card {
+  transition: box-shadow 150ms, transform 150ms;
+}
+
+.template-card:hover {
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+  transform: translateY(-2px);
+}
+
+.template-card button:hover {
+  background: #9e4626;
 }
 
 .template-card button {
@@ -452,11 +756,15 @@ body {
 /* Save, download and print, at the end of the editor toolbar. */
 .slip-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
 }
 
-.slip-actions button,
+/* One look for the plain buttons: header, toolbar, dialogs. */
+.app-header-button,
+.editor-toolbar button,
+.access-form button,
 .modal button {
   font: inherit;
   font-size: 14px;
@@ -464,12 +772,91 @@ body {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
+  color: #1f1b18;
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms;
+}
+
+.app-header-button:hover:not(:disabled),
+.editor-toolbar button:hover:not(:disabled),
+.access-form button:hover:not(:disabled),
+.modal button:hover:not(:disabled) {
+  background: #f7f3ef;
+  border-color: #c9bdb3;
+}
+
+.editor-toolbar button:disabled,
+.access-form button:disabled {
+  cursor: default;
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Undo and Redo, floating on the working desk's top-left corner (hidden while there's nothing to undo or redo). */
+.desk-history {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgb(31 27 24 / 0.82);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  animation: saved-in 150ms ease-out;
+}
+
+.desk-history[hidden] {
+  display: none;
+}
+
+.desk-history button {
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  padding: 5px 11px;
+  border-radius: 999px;
   cursor: pointer;
 }
 
-.slip-actions button:disabled {
+.desk-history button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.desk-history button:disabled {
+  opacity: 0.35;
   cursor: default;
-  opacity: 0.5;
+}
+
+.desk-history-sep {
+  width: 1px;
+  height: 16px;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.saved-note {
+  font-size: 13px;
+  color: #2f7a45;
+  animation: saved-in 200ms ease-out;
+}
+
+@keyframes saved-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
 }
 
 .modal {
@@ -550,6 +937,28 @@ body {
   gap: 4px;
   margin-top: 8px;
   font-size: 13px;
+}
+
+.asset-upload input[type="file"] {
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.asset-upload input[type="file"]::file-selector-button {
+  margin-right: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: #1f1b18;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.asset-upload input[type="file"]::file-selector-button:hover {
+  background: #f7f3ef;
 }
 
 .asset-upload input[type="text"] {
@@ -646,11 +1055,45 @@ body {
 }
 
 .replay-chips {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.replay-chips summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.replay-chips-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.replay-chips-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 0;
-  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+
+.replay-chips .chip {
+  font-size: 12px;
+  padding: 3px 9px;
+}
+
+/* A demo request already sent: still there to send again, but quieter. */
+.chip-used {
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 .chip:disabled {
@@ -660,42 +1103,39 @@ body {
 
 /* Pointing at the working slip: the chip above the message box and the tag on the seller's bubble. */
 .selection-tip {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 12px;
   color: var(--muted);
 }
 
-.selection-chip {
-  align-self: flex-start;
-  display: inline-flex;
+/* The selection, as a tinted strip joined to the top of the message box; the box's border takes its colour. */
+.selection-strip {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 4px 3px 10px;
+  padding: 4px 6px 4px 10px;
   border: 1px solid var(--selection);
-  border-radius: 999px;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
   background: #fff1e8;
   color: #8a3305;
   font-size: 13px;
 }
 
-.selection-chip button {
+.selection-strip .selection-clear {
+  margin-left: auto;
   border: none;
   background: transparent;
   color: inherit;
-  cursor: pointer;
-}
-
-.selection-chip .selection-bigger {
-  border: 1px solid var(--selection);
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 11px;
-}
-
-.selection-chip .selection-clear {
   font-size: 16px;
   line-height: 1;
   padding: 0 4px;
+  cursor: pointer;
+}
+
+.composer-selected textarea {
+  border-color: var(--selection);
+  border-radius: 0 0 6px 6px;
 }
 
 .selection-tag {

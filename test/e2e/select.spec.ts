@@ -24,7 +24,7 @@ function selectionNoteOf(message: string): string {
 const items = (slip: FrameLocator) => slip.locator("table.items");
 const skuCell = (slip: FrameLocator) => slip.locator("td.col-sku").first();
 
-test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps back, and clearing works", async ({ page }) => {
+test("hovering shows boxes and a name tag; clicks drill in, and clearing works", async ({ page }) => {
   const ed = editor(page);
   await page.goto("/");
   await expect(ed.selectionTip).toBeVisible();
@@ -37,7 +37,7 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
 
   // The first click selects the whole section.
   await skuCell(ed.working).click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Items/);
+  await expect(ed.selectionChip).toHaveText(/Selected: Items/);
   await expect(ed.selectionTip).toHaveCount(0);
   await expect.poll(() => outline(items(ed.working))).toBe("solid");
   // In the app's --selection colour, which the slip's own document doesn't have.
@@ -47,11 +47,12 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
   await expect(ed.nameTag).toHaveText("SKU column");
 
   await skuCell(ed.working).click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: SKU column/);
-
-  await ed.selectBiggerButton.click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Items/);
-  await expect(ed.selectBiggerButton).toHaveCount(0);
+  await expect(ed.selectionChip).toHaveText(/Selected: SKU column/);
+  // A part repeated on every row has its other copies boxed too: an edit reaches them all.
+  const skuCells = await ed.working.locator("td.col-sku").count();
+  await expect(ed.working.locator("td.col-sku[data-flint-echo]")).toHaveCount(skuCells - 1);
+  // The chip names the part and offers only the ×.
+  await expect(ed.selectionChip.getByRole("button")).toHaveCount(1);
 
   await ed.clearSelectionButton.click();
   await expect(ed.selectionChip).toHaveCount(0);
@@ -59,11 +60,14 @@ test("hovering shows boxes and a name tag; clicks drill in, Select bigger steps 
 
   // Clicking the selected part again deselects it; clicking outside every part clears.
   await ed.working.locator(".thank-you").click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Thank you/);
+  await expect(ed.selectionChip).toHaveText(/Selected: Thank you/);
+  // With nothing finer inside it, the name tag says another click clears it.
+  await ed.working.locator(".thank-you").hover();
+  await expect(ed.nameTag).toHaveText("Thank you · click to clear");
   await ed.working.locator(".thank-you").click();
   await expect(ed.selectionChip).toHaveCount(0);
   await ed.working.locator(".order-details").click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Header/);
+  await expect(ed.selectionChip).toHaveText(/Selected: Header/);
   await ed.working.locator("body").click({ position: { x: 5, y: 5 } });
   await expect(ed.selectionChip).toHaveCount(0);
 
@@ -140,7 +144,7 @@ test("of two look-alike sections, clicking the second sends its tag as occurrenc
   await expect(ed.working.getByText("Return to")).toBeVisible();
 
   await ed.working.getByText("Return to").click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Addresses/);
+  await expect(ed.selectionChip).toHaveText(/Selected: Addresses/);
   await ed.send("Make this smaller (look-alike)");
   await expect(ed.flintSays("Smaller now")).toBeVisible();
 
@@ -162,7 +166,7 @@ test("of two parts on one template line, the clicked one's tag is sent", async (
 
   await ed.working.locator(".badge-eco").click();
   await ed.working.locator(".badge-eco").click();
-  await expect(ed.selectionChip).toHaveText(/📍 About: Badge eco/);
+  await expect(ed.selectionChip).toHaveText(/Selected: Badge eco/);
   await ed.send("Make this green (siblings)");
   await expect(ed.flintSays("Green it is")).toBeVisible();
 

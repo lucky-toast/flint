@@ -8,28 +8,23 @@ import {
   type Shop,
 } from "../../core";
 
-type Props = {
-  /** What the working slip is compared against. */
-  original: string;
-  working: string;
-  shop: Shop;
-  assets?: Record<string, string>;
-};
+/** The short what-changed line; a quiet check when every item and price still shows. */
+export function WhatChanged({ changes }: { changes: Changes }) {
+  const clear = !missingItemsWarning(changes) && !extraItemsWarning(changes) && changes.orders.length === 0;
+  return (
+    <p className={clear ? "what-changed what-changed-ok" : "what-changed"} data-testid="what-changed">
+      {whatChanged(changes)}
+    </p>
+  );
+}
 
-/**
- * The what-changed line and the missing/extra item warnings, across every example order.
- * Shown once the working slip differs from the original. The warnings inform and never block.
- */
-export function ItemChanges({ original, working, shop, assets }: Props) {
-  const changes = useItemChanges(original, working, shop, assets);
-  if (!changes) return null;
+/** The missing/extra item warnings, across every example order. They inform and never block. */
+export function ItemWarnings({ changes }: { changes: Changes }) {
   const missing = missingItemsWarning(changes);
   const extra = extraItemsWarning(changes);
+  if (!missing && !extra) return null;
   return (
     <div className="item-changes">
-      <p className="what-changed" data-testid="what-changed">
-        {whatChanged(changes)}
-      </p>
       {missing && (
         <p className="item-warning" role="status" data-testid="missing-items">
           {missing}
@@ -45,7 +40,7 @@ export function ItemChanges({ original, working, shop, assets }: Props) {
 }
 
 /** The counter's result for the current working slip, or null when it matches the original (or is still counting). */
-function useItemChanges(original: string, working: string, shop: Shop, assets?: Record<string, string>) {
+export function useItemChanges(original: string, working: string, shop: Shop, assets?: Record<string, string>) {
   const [result, setResult] = useState<{ working: string; changes: Changes } | null>(null);
 
   useEffect(() => {

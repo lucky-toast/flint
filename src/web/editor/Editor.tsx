@@ -3,13 +3,14 @@ import type { Shop, Template } from "../../core";
 import { uploadFollowUp } from "../assets/asset-store";
 import { useUploadedAssets } from "../assets/useUploadedAssets";
 import { Chat } from "../chat/Chat";
-import { SelectionChip } from "../chat/SelectionChip";
+import { SelectionTip } from "../chat/SelectionChip";
 import { useSlipSelection } from "../selection/useSlipSelection";
 import { canRedo, canUndo, hasUnsavedChanges, pendingTurn, retryableTurn, workingSource } from "../session/session";
 import { useSession } from "../session/useSession";
-import { ItemChanges } from "./ItemChanges";
+import { ItemWarnings, useItemChanges, WhatChanged } from "./ItemChanges";
+import { OrderHint } from "./OrderHint";
 import { OrderPicker } from "./OrderPicker";
-import { ShowCode } from "./ShowCode";
+import { CodeView, SlipCodeSwitch } from "./ShowCode";
 import { SlipActions } from "./SlipActions";
 import { SlipPane } from "./SlipPane";
 
@@ -45,26 +46,23 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
     return result;
   };
   const [orderId, setOrderId] = useState(shop.defaultOrderId);
+  const [codeShown, setCodeShown] = useState(false);
+  // On a narrow screen the seller can fold the original away so the working slip gets the room.
+  const [originalHidden, setOriginalHidden] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  // The item-change counter, run once per working template: its line goes on the Working heading.
+  const itemChanges = useItemChanges(session.state.original, workingSource(session.state), shop, uploads.assets);
   const order = shop.orders.find((o) => o.id === orderId) ?? shop.orders[0]!;
+  const switchOrder = (id: string) => {
+    // Another order may not have the part, so the selection clears.
+    slipSelection.clear();
+    setOrderId(id);
+  };
 
   return (
     <div className="editor">
       <div className="editor-toolbar">
-        <OrderPicker
-          orders={shop.orders}
-          orderId={order.id}
-          onChange={(id) => {
-            // Another order may not have the part, so the selection clears.
-            slipSelection.clear();
-            setOrderId(id);
-          }}
-        />
-        <button type="button" onClick={session.undo} disabled={!canUndo(session.state)}>
-          Undo
-        </button>
-        <button type="button" onClick={session.redo} disabled={!canRedo(session.state)}>
-          Redo
-        </button>
+        <OrderPicker orders={shop.orders} orderId={order.id} onChange={switchOrder} />
         <SlipActions
           shop={shop}
           template={template}
@@ -76,15 +74,24 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           }}
         />
       </div>
-      <div className="editor-panes">
-        <SlipPane
-          label="Original"
-          source={session.state.original}
-          shop={shop}
-          order={order}
-          paper={template.paper}
-          assets={uploads.assets}
-        />
+      <div className={originalHidden ? "editor-panes editor-panes-single" : "editor-panes"}>
+        {!originalHidden && (
+          <SlipPane
+            label="Original"
+            source={session.state.original}
+            shop={shop}
+            order={order}
+            paper={template.paper}
+            assets={uploads.assets}
+            zoom={zoom}
+            onZoom={setZoom}
+            action={
+              <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(true)}>
+                Hide original
+              </button>
+            }
+          />
+        )}
         <SlipPane
           label="Working"
           source={workingSource(session.state)}
@@ -93,9 +100,43 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
           paper={template.paper}
           assets={uploads.assets}
           pointing={{ onDocument: slipSelection.onDocument }}
-          footer={<ShowCode original={session.state.original} working={workingSource(session.state)} />}
+          zoom={zoom}
+          onZoom={setZoom}
+          glowOnChange
+          action={
+            <>
+              <SlipCodeSwitch shown={codeShown} onChange={setCodeShown} />
+              {itemChanges && <WhatChanged changes={itemChanges} />}
+              {originalHidden && (
+                <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(false)}>
+                  Show original
+                </button>
+              )}
+            </>
+          }
+          overlay={
+            // Undo and Redo float on the working desk, and only while there's something to undo or redo.
+            <div className="desk-history" role="group" aria-label="History" hidden={!canUndo(session.state) && !canRedo(session.state)}>
+              <button type="button" aria-label="Undo" title="Undo" onClick={session.undo} disabled={!canUndo(session.state)}>
+                ↶
+              </button>
+              <span className="desk-history-sep" aria-hidden="true" />
+              <button type="button" aria-label="Redo" title="Redo" onClick={session.redo} disabled={!canRedo(session.state)}>
+                ↷
+              </button>
+            </div>
+          }
+          cover={codeShown && <CodeView original={session.state.original} working={workingSource(session.state)} />}
         >
-          <ItemChanges original={session.state.original} working={workingSource(session.state)} shop={shop} assets={uploads.assets} />
+          {itemChanges && <ItemWarnings changes={itemChanges} />}
+          <OrderHint
+            original={session.state.original}
+            working={workingSource(session.state)}
+            shop={shop}
+            order={order}
+            assets={uploads.assets}
+            onShowOrder={switchOrder}
+          />
         </SlipPane>
       </div>
       <Chat
@@ -107,14 +148,8 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
         onUpload={upload}
         redoPending={session.state.redo.length > 0}
         replayChips={replayChips}
-        selectionChip={
-          <SelectionChip
-            name={slipSelection.selection?.name}
-            canSelectBigger={slipSelection.canSelectBigger}
-            onSelectBigger={slipSelection.selectBigger}
-            onClear={slipSelection.clear}
-          />
-        }
+        selectionChip={slipSelection.selection ? undefined : <SelectionTip />}
+        selection={slipSelection.selection && { name: slipSelection.selection.name, onClear: slipSelection.clear }}
       />
     </div>
   );
