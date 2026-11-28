@@ -8,9 +8,9 @@
 //   GET    /health
 // Ember's endpoint:
 //   POST   /v1/responses         answered by the script whose `match` occurs in the turn's user message
-//                                (the longest match wins). The response served is responses[attempt - 1],
-//                                where the attempt is counted from the retry items in the request, so
-//                                the fake is stateless across turns and parallel tests don't interfere.
+//                                (the longest match wins). The response served is responses[attempt - 1].
+//                                A chained retry (previous_response_id) is one attempt on from the
+//                                response it names; a stateless request counts its retry items instead.
 // Unscripted calls get a 500, which the Worker reports as "Flint is resting". Calls without the
 // placeholder key from .dev.vars.e2e get a 401, so a leaked real key fails the test instead.
 //
@@ -23,6 +23,7 @@ type Script = { id: string; match: string; responses: unknown[]; delayMs: number
 const port = Number(process.argv[2] ?? process.env.FAKE_EMBER_PORT ?? 10788);
 const scripts = new Map<string, Script>();
 let nextId = 1;
+let nextResponseId = 1;
 
 async function readJson(req: IncomingMessage): Promise<any> {
   const chunks: Buffer[] = [];
@@ -35,9 +36,20 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-/** The first input item is the turn's user message; every later user message or tool output is a retry. */
-function turnOf(body: any): { message: string; attempt: number } {
+/** The response ids this fake has served, and the turn and attempt each one answered. */
+const served = new Map<string, { message: string; attempt: number }>();
+
+/**
+ * A chained request (previous_response_id) continues the turn of the response it names, one attempt on.
+ * Otherwise the first input item is the turn's user message, and every later user message or tool output
+ * is a retry (the stateless shape).
+ */
+function turnOf(body: any): { message: string; attempt: number } | undefined {
   const input: any[] = Array.isArray(body?.input) ? body.input : [];
+  if (typeof body?.previous_response_id === "string") {
+    const previous = served.get(body.previous_response_id);
+    return previous && { message: previous.message, attempt: previous.attempt + 1 };
+  }
   const first = input[0]?.content;
   const message = typeof first === "string" ? first : JSON.stringify(first ?? "");
   const retries = input.slice(1).filter((item) => item?.type === "function_call_output" || item?.role === "user").length;
@@ -61,7 +73,12 @@ async function respond(req: IncomingMessage, res: ServerResponse) {
     return send(res, 401, { error: { message: "fake Ember: unexpected API key" } });
   }
   const body = await readJson(req);
-  const { message, attempt } = turnOf(body);
+  const turn = turnOf(body);
+  if (!turn) {
+    console.error(`[fake-ember] unknown previous_response_id: ${body.previous_response_id}`);
+    return send(res, 400, { error: { message: "fake Ember: previous response not found" } });
+  }
+  const { message, attempt } = turn;
   const script = findScript(message);
   if (!script) {
     console.error(`[fake-ember] no script matches this turn:\n${message.slice(-300)}`);
@@ -77,7 +94,10 @@ async function respond(req: IncomingMessage, res: ServerResponse) {
   // A scripted HTTP failure: { httpStatus, body }.
   const failure = response as { httpStatus?: number; body?: unknown };
   if (typeof failure.httpStatus === "number") return send(res, failure.httpStatus, failure.body ?? {});
-  send(res, 200, response);
+  // A fresh id per serve, so a chained retry can find this turn and attempt again.
+  const id = `resp_fake_${nextResponseId++}`;
+  served.set(id, { message, attempt });
+  send(res, 200, { ...(response as object), id });
 }
 
 const server = createServer(async (req, res) => {

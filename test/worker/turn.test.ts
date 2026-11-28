@@ -1,9 +1,9 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAX_SELECTION_LENGTH } from "../../src/core";
+import { MAX_SELECTION_LENGTH, NO_TOOL_NUDGE } from "../../src/core";
 import { builtInTemplates } from "../../src/data";
 import { turnHeaders } from "./client";
-import { commentary, editCall, fakeEmber, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
+import { commentary, editCall, fakeEmber, httpError, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
 
 const classic = builtInTemplates.find((t) => t.id === "classic")!.source;
 const SORT_FIND = `{% assign items = order.lineItems | sort: "title" %}`;
@@ -47,7 +47,7 @@ describe("POST /api/turn, live edit", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("calls Ember statelessly with the system prompt, all four tools and the turn in one user message", async () => {
+  it("starts a stored Ember conversation with the system prompt, all four tools and the turn in one user message", async () => {
     const calls = fakeEmber(sortEdit());
 
     await turnJson({
@@ -59,14 +59,16 @@ describe("POST /api/turn, live edit", () => {
     expect(headers.get("authorization")).toBe("Bearer test-ember-key");
     expect(body).toMatchObject({
       model: "muse-ember-1.0",
-      store: false,
-      include: ["reasoning.encrypted_content"],
+      prompt_cache_key: "flint-kiln-and-co",
+      store: true,
       tool_choice: "auto",
       parallel_tool_calls: false,
       reasoning: { effort: "low" },
       max_output_tokens: 4000,
     });
+    // A new conversation: nothing to chain from, and Ember keeps its own reasoning server-side.
     expect(body.previous_response_id).toBeUndefined();
+    expect(body.include).toBeUndefined();
     expect(body.tools.map((t: any) => [t.type, t.name])).toEqual([
       ["function", "edit_template"],
       ["function", "ask_clarification"],
@@ -99,28 +101,35 @@ describe("POST /api/turn, live edit", () => {
 
     expect(calls).toHaveLength(2);
     const retry = calls[1]!.body;
-    // Same stateless request, now with attempt 1's reasoning, commentary and call, then the error.
+    // The retry chains from attempt 1's stored response and sends only the error for its call;
+    // instructions, tools and the cache key are resent because they don't carry over.
+    expect(retry.previous_response_id).toMatch(/^resp_/);
+    expect(retry.store).toBe(true);
+    expect(retry.include).toBeUndefined();
     expect(retry.instructions).toBe(calls[0]!.body.instructions);
-    expect(retry.input.map((i: any) => i.type ?? i.role)).toEqual([
-      "user",
-      "reasoning",
-      "assistant",
-      "function_call",
-      "function_call_output",
-    ]);
-    expect(retry.input[1]).toEqual({
-      type: "reasoning",
-      id: expect.any(String),
-      summary: [],
-      encrypted_content: expect.stringMatching(/^encrypted-/),
-    });
-    expect(retry.input[3]).toEqual({
-      type: "function_call",
-      call_id: expect.stringMatching(/^call_/),
-      name: "edit_template",
-      arguments: expect.any(String),
-    });
-    expect(retry.input[4].call_id).toBe(retry.input[3].call_id);
+    expect(retry.tools).toEqual(calls[0]!.body.tools);
+    expect(retry.prompt_cache_key).toBe("flint-kiln-and-co");
+    expect(retry.input).toEqual([{ type: "function_call_output", call_id: expect.stringMatching(/^call_/), output: expect.any(String) }]);
+  });
+
+  it("resends a chained retry when Ember briefly answers HTTP 400", async () => {
+    const calls = fakeEmber(editCall([{ find: "nowhere to be found", replace: "x" }], "Hm"), httpError(400), sortEdit());
+
+    expect(await turnJson({ message: "Sort items" })).toMatchObject({ type: "edit", templateSource: sorted });
+    expect(calls).toHaveLength(3);
+    expect(calls[2]!.body).toEqual(calls[1]!.body);
+  });
+
+  it("chains each retry from the attempt just before it", async () => {
+    const bad = () => editCall([{ find: "nowhere to be found", replace: "x" }], "Hm");
+    const calls = fakeEmber(bad(), bad(), sortEdit());
+
+    expect(await turnJson({ message: "Sort items" })).toMatchObject({ type: "edit", templateSource: sorted });
+    const ids = calls.map((c) => c.body.previous_response_id);
+    expect(ids[0]).toBeUndefined();
+    expect(ids[1]).toMatch(/^resp_/);
+    expect(ids[2]).toMatch(/^resp_/);
+    expect(ids[2]).not.toBe(ids[1]);
   });
 
   it("tells Ember the specific error, that the template is unchanged, and to call edit_template again", async () => {
@@ -190,13 +199,14 @@ describe("POST /api/turn, live edit", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("returns invalid after three rejected attempts, each with the previous attempts' feedback", async () => {
+  it("returns invalid after three rejected attempts, each sending the previous attempt's feedback", async () => {
     const bad = () => editCall([{ find: "nowhere to be found", replace: "x" }], "Hm");
     const calls = fakeEmber(bad(), bad(), bad());
 
     expect(await turnJson({ message: "Sort items" })).toEqual({ type: "error", error: "invalid" });
     expect(calls).toHaveLength(3);
-    expect(calls[2]!.body.input.filter((i: any) => i.type === "function_call_output")).toHaveLength(2);
+    expect(feedback(calls[1]!)).toMatch(/^Edit rejected: /);
+    expect(feedback(calls[2]!)).toMatch(/^Edit rejected: /);
   });
 
   it("nudges Ember to call edit_template when it answers a retry with text", async () => {
@@ -258,10 +268,42 @@ describe("POST /api/turn, other outcomes", () => {
     });
   });
 
-  it("returns plain text on the first attempt as a reply", async () => {
-    fakeEmber({ output: [reasoning(), textMessage("Hi there! 👋")] });
+  it("nudges Ember to call a tool when its first answer is only text, and uses the call it then makes", async () => {
+    const calls = fakeEmber(
+      { output: [reasoning(), textMessage("Sorting your items by quantity for you!")] },
+      sortEdit(),
+    );
+
+    expect(await turnJson({ message: "Sort items" })).toMatchObject({ type: "edit", templateSource: sorted });
+    expect(calls).toHaveLength(2);
+    // The nudge chains from the text-only answer, which Ember already holds.
+    expect(calls[1]!.body.previous_response_id).toMatch(/^resp_/);
+    expect(calls[1]!.body.input).toEqual([{ role: "user", content: NO_TOOL_NUDGE }]);
+    expect(NO_TOOL_NUDGE).toContain("ask_clarification");
+  });
+
+  it("lets Ember ask instead after the nudge", async () => {
+    fakeEmber(
+      { output: [reasoning(), textMessage("How much smaller would you like it?")] },
+      toolCall("ask_clarification", { question: "How much smaller?", options: ["A little", "Back to the original"] }),
+    );
+
+    expect(await turnJson({ message: "A bit smaller" })).toEqual({
+      type: "ask",
+      question: "How much smaller?",
+      options: ["A little", "Back to the original"],
+    });
+  });
+
+  it("returns the last text as a reply when every attempt is only text", async () => {
+    const calls = fakeEmber(
+      { output: [reasoning(), textMessage("Hi there!")] },
+      { output: [reasoning(), textMessage("Hello!")] },
+      { output: [reasoning(), textMessage("Hi there! 👋")] },
+    );
 
     expect(await turnJson({ message: "hello" })).toEqual({ type: "reply", message: "Hi there! 👋" });
+    expect(calls).toHaveLength(3);
   });
 
   it("never shows Ember's commentary alongside a tool call", async () => {

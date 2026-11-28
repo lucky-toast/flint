@@ -54,7 +54,7 @@ describe("turn logging", () => {
       request: "Make the logo bigger",
       url: "https://api.meta.ai/v1/responses",
       httpStatus: 200,
-      requestBody: { model: "muse-ember-1.0", store: false },
+      requestBody: { model: "muse-ember-1.0", store: true },
       response: { status: "completed" },
     });
     expect(calls[1].requestBody.input.at(-1).type).toBe("function_call_output");

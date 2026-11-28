@@ -1,7 +1,9 @@
 import type { FunctionTool } from "./tools";
 
-// A minimal client for Muse Ember's Responses API, used statelessly: nothing is stored server
-// side, and encrypted reasoning is requested so it can be resent within a turn's retries.
+// A minimal client for Muse Ember's Responses API, used in stored mode: Ember keeps each response
+// (store: true), and a follow-up request chains from it with previous_response_id, sending only
+// the items that are new. Ember carries the earlier turns, its reasoning included, server-side.
+// Instructions, tools and the cache key don't carry over, so every request resends them.
 
 export const EMBER_MODEL = "muse-ember-1.0";
 export const DEFAULT_EMBER_BASE_URL = "https://api.meta.ai/v1";
@@ -24,13 +26,40 @@ export type OutputItem = ReasoningItem | MessageItem | FunctionCallItem | { type
 export type Usage = { inputTokens: number; cachedInputTokens: number; outputTokens: number };
 
 export type EmberResponse = {
+  /** The stored response's id, to chain the next request from. */
+  id?: string;
   /** "incomplete" means the output was truncated (e.g. by max_output_tokens). */
   status: "completed" | "incomplete" | (string & {});
   output: OutputItem[];
   usage: Usage;
 };
 
-export type EmberRequest = { instructions: string; input: InputItem[]; tools: FunctionTool[] };
+export type EmberRequest = {
+  instructions: string;
+  input: InputItem[];
+  tools: FunctionTool[];
+  /** Sent as prompt_cache_key: requests with the same key go to the same Ember server, so a shared prefix is more likely cached. */
+  cacheKey?: string;
+  /** Chains this request from a stored response, so input holds only what is new since then. */
+  previousResponseId?: string;
+  /**
+   * Bytes of earlier conversation that previousResponseId stands for. Not sent, but Ember's usage
+   * counts that history as input, so the budget's worst-case estimate counts these bytes too.
+   */
+  storedBytes?: number;
+};
+
+/** How often a chained request that answers HTTP 400 is retried, and the backoff step. */
+export const CHAIN_RETRIES = 2;
+export const CHAIN_RETRY_MS = 500;
+
+/**
+ * One cache key per shop. Requests for a shop share its prefix (instructions and tools), and
+ * Meta advises one stable key per shared prefix, not one per user or session (#43).
+ */
+export function promptCacheKey(shopId: string): string {
+  return `flint-${shopId}`;
+}
 
 export type EmberClient = { respond(request: EmberRequest): Promise<EmberResponse> };
 
@@ -52,17 +81,18 @@ export type EmberClientOptions = {
 };
 
 /** The full request body: stable content (instructions, tools) first so the prefix caches. */
-export function requestBody({ instructions, input, tools }: EmberRequest) {
+export function requestBody({ instructions, input, tools, cacheKey, previousResponseId }: EmberRequest) {
   return {
     model: EMBER_MODEL,
+    ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
     instructions,
     tools,
     tool_choice: "auto",
     parallel_tool_calls: false,
     reasoning: { effort: "low" },
     max_output_tokens: MAX_OUTPUT_TOKENS,
-    store: false,
-    include: ["reasoning.encrypted_content"],
+    store: true,
+    ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
     input,
   };
 }
@@ -72,18 +102,28 @@ export function createEmberClient({ apiKey, baseUrl = DEFAULT_EMBER_BASE_URL, fe
   return {
     async respond(request) {
       const doFetch = fetchImpl ?? globalThis.fetch;
-      let res: Response;
-      try {
-        res = await doFetch(url, {
-          method: "POST",
-          headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-          body: JSON.stringify(requestBody(request)),
-        });
-      } catch (err) {
-        throw new EmberError(`Ember request failed: ${err instanceof Error ? err.message : String(err)}`);
+      const payload = JSON.stringify(requestBody(request));
+      const send = async () => {
+        try {
+          return await doFetch(url, {
+            method: "POST",
+            headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+            body: payload,
+          });
+        } catch (err) {
+          throw new EmberError(`Ember request failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      };
+      let res = await send();
+      // Meta: a response that has only just completed can briefly answer HTTP 400 when chained
+      // from. Retry with a short backoff.
+      for (let retry = 1; res.status === 400 && request.previousResponseId && retry <= CHAIN_RETRIES; retry++) {
+        await new Promise((resolve) => setTimeout(resolve, CHAIN_RETRY_MS * retry));
+        res = await send();
       }
       if (!res.ok) throw new EmberError(`Ember answered HTTP ${res.status}`, res.status);
       let body: {
+        id?: string;
         status?: string;
         output?: OutputItem[];
         usage?: {
@@ -99,6 +139,7 @@ export function createEmberClient({ apiKey, baseUrl = DEFAULT_EMBER_BASE_URL, fe
       }
       if (!body || typeof body !== "object") throw new EmberError("Ember answered a body that isn't a JSON object");
       return {
+        ...(typeof body.id === "string" ? { id: body.id } : {}),
         status: body.status ?? "completed",
         output: Array.isArray(body.output) ? body.output : [],
         usage: {
@@ -111,7 +152,11 @@ export function createEmberClient({ apiKey, baseUrl = DEFAULT_EMBER_BASE_URL, fe
   };
 }
 
-/** Rewrites one attempt's output as input items to resend on a retry, in their original order. */
+/**
+ * Rewrites one attempt's output as input items, in their original order, for replaying a
+ * conversation without previous_response_id (the tweak-test harness's stateless mode). Flint
+ * itself chains stored responses instead.
+ */
 export function replayItems(output: OutputItem[]): InputItem[] {
   const items: InputItem[] = [];
   for (const item of output) {
