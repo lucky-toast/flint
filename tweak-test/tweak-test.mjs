@@ -68,6 +68,17 @@ const args = Object.fromEntries(
     return [k, v.length ? v.join("=") : true];
   }),
 );
+// Refuse unknown options: a typo, or an option from a newer version of this script, must not
+// silently run a different experiment than the one asked for.
+const KNOWN_OPTIONS = [
+  "runs", "variants", "only", "templates", "max-calls", "token-budget", "timeout-s", "self-test", "skip-self-test",
+  "dry-run", "mock", "print-request", "responses-state", "cache-key",
+];
+const unknownOptions = Object.keys(args).filter((k) => !KNOWN_OPTIONS.includes(k));
+if (unknownOptions.length) {
+  console.error(`error: unknown option(s): ${unknownOptions.map((k) => `--${k}`).join(", ")}. Known: ${KNOWN_OPTIONS.map((k) => `--${k}`).join(", ")}`);
+  process.exit(1);
+}
 const int = (v, d) => (v === undefined ? d : Number.parseInt(v, 10));
 const list = (v, d) => (v === undefined || v === true ? d : String(v).split(",").filter(Boolean));
 
