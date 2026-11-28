@@ -8,6 +8,8 @@
     "build": "vite build",
     "start": "npm run build && node scripts/dev.mjs",
     "review": "node scripts/review.mjs",
+    "tweak-test": "node tweak-test/tweak-test.mjs",
+    "tweak-test:review": "node tweak-test/review.mjs",
     "deploy": "npm run build && wrangler deploy --env=\"\"",
     "typecheck": "tsc -p tsconfig.web.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.node.json",
     "cf-typegen": "wrangler types --strict-vars=false",

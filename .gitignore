@@ -30,3 +30,6 @@ logs/
 
 # Design mockups (/mockup skill output)
 mockups/
+
+# Tweak-test output (raw API requests/responses)
+tweak-test/results/
