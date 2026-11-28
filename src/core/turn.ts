@@ -37,6 +37,15 @@ export type TurnResult =
 /** The first attempt plus at most two retries. */
 export const MAX_ATTEMPTS = 3;
 
+/**
+ * Sent when Ember answers with only text before any rejection in this turn. It often says it's
+ * making the change ("Moving that to the top!") and stops, which would show the seller a promise
+ * with no edit. Any tool is allowed, so a genuine question can still be asked properly.
+ */
+export const NO_TOOL_NUDGE =
+  "You answered with text but didn't call a tool, so nothing changed and the seller saw nothing. Call exactly one tool now: edit_template to make the change, ask_clarification if you need to ask something, or reply if no change is needed.";
+
+/** Sent when Ember answers a rejected edit with text instead of fixing it. */
 export const TEXT_ON_RETRY_NUDGE =
   "You replied with text but did not call edit_template, so nothing changed. Call edit_template now with the fix. Do not reply with text.";
 
@@ -58,6 +67,8 @@ export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurn
   // Edits are validated with placeholder images under the uploaded names.
   const shop = withUploadedAssets(baseShop, input.uploadedAssets);
   const items: InputItem[] = [{ role: "user", content: buildUserMessage(input) }];
+  // Once a tool call has been rejected, text is never shown: Ember must fix the call.
+  let rejected = false;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const response = await ember.respond({ instructions, input: items, tools: TOOLS });
@@ -68,13 +79,15 @@ export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurn
     const call = firstFunctionCall(response.output);
     if (!call) {
       const text = messageText(response.output).trim();
-      if (attempt === 1 && text) return { type: "reply", message: text };
-      items.push(...replayItems(response.output), { role: "user", content: TEXT_ON_RETRY_NUDGE });
+      // Text only on every attempt: show the last text rather than nothing.
+      if (!rejected && attempt === MAX_ATTEMPTS && text) return { type: "reply", message: text };
+      items.push(...replayItems(response.output), { role: "user", content: rejected ? TEXT_ON_RETRY_NUDGE : NO_TOOL_NUDGE });
       continue;
     }
 
     const outcome = await handleCall(call, shop, input.templateSource);
     if ("result" in outcome) return outcome.result;
+    rejected = true;
     items.push(...replayItems(response.output), {
       type: "function_call_output",
       call_id: call.call_id,

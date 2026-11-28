@@ -1,6 +1,6 @@
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAX_SELECTION_LENGTH } from "../../src/core";
+import { MAX_SELECTION_LENGTH, NO_TOOL_NUDGE } from "../../src/core";
 import { builtInTemplates } from "../../src/data";
 import { turnHeaders } from "./client";
 import { commentary, editCall, fakeEmber, reasoning, textMessage, toolCall, truncated } from "./fake-ember";
@@ -258,10 +258,46 @@ describe("POST /api/turn, other outcomes", () => {
     });
   });
 
-  it("returns plain text on the first attempt as a reply", async () => {
-    fakeEmber({ output: [reasoning(), textMessage("Hi there! 👋")] });
+  it("nudges Ember to call a tool when its first answer is only text, and uses the call it then makes", async () => {
+    const calls = fakeEmber(
+      { output: [reasoning(), textMessage("Sorting your items by quantity for you!")] },
+      sortEdit(),
+    );
+
+    expect(await turnJson({ message: "Sort items" })).toMatchObject({ type: "edit", templateSource: sorted });
+    expect(calls).toHaveLength(2);
+    // The text-only answer goes back to Ember, followed by the nudge.
+    const input = calls[1]!.body.input;
+    expect(input.at(-2)).toEqual({
+      role: "assistant",
+      content: [{ type: "output_text", text: "Sorting your items by quantity for you!" }],
+    });
+    expect(input.at(-1)).toEqual({ role: "user", content: NO_TOOL_NUDGE });
+    expect(NO_TOOL_NUDGE).toContain("ask_clarification");
+  });
+
+  it("lets Ember ask instead after the nudge", async () => {
+    fakeEmber(
+      { output: [reasoning(), textMessage("How much smaller would you like it?")] },
+      toolCall("ask_clarification", { question: "How much smaller?", options: ["A little", "Back to the original"] }),
+    );
+
+    expect(await turnJson({ message: "A bit smaller" })).toEqual({
+      type: "ask",
+      question: "How much smaller?",
+      options: ["A little", "Back to the original"],
+    });
+  });
+
+  it("returns the last text as a reply when every attempt is only text", async () => {
+    const calls = fakeEmber(
+      { output: [reasoning(), textMessage("Hi there!")] },
+      { output: [reasoning(), textMessage("Hello!")] },
+      { output: [reasoning(), textMessage("Hi there! 👋")] },
+    );
 
     expect(await turnJson({ message: "hello" })).toEqual({ type: "reply", message: "Hi there! 👋" });
+    expect(calls).toHaveLength(3);
   });
 
   it("never shows Ember's commentary alongside a tool call", async () => {

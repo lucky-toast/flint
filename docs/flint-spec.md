@@ -195,7 +195,7 @@ It covers the persona, the rules below, the typed schema with example values and
 2. Check rate limits and reserve the worst-case token cost in the budget Durable Object. If either fails, answer from replay or with "Flint is resting".
 3. Up to three attempts (the first plus at most two retries), each followed by settling the actual usage in the budget object:
    - **Truncated:** return a "too big" error. Don't retry.
-   - **No tool call:** on the first attempt, return the text as a reply. On a retry, send the reasoning and message back with an instruction to call `edit_template` with the fix instead of replying with text.
+   - **No tool call:** send the reasoning and message back with a nudge. Before any rejection in the turn, the nudge asks for exactly one tool call (`edit_template`, `ask_clarification` or `reply`), because Ember sometimes says it's making a change and then stops. If every attempt is only text, return the last text as a reply. After a rejection, the nudge asks Ember to call `edit_template` with the fix, and text is never returned.
    - **A tool other than `edit_template`:** return it.
    - **`edit_template`:** apply the edits, parse, then render against every example order for the shop, using placeholder assets. If that succeeds, return the new template and summary. If not, send the reasoning, function call and a `function_call_output` saying the edit was rejected, with the specific error, that the template is unchanged, and that it should call `edit_template` again.
 4. After the last attempt fails, return an "invalid" error.

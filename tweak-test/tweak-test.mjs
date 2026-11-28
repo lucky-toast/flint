@@ -290,6 +290,7 @@ function rejectionKind(error) {
 async function request(conv, current, meta) {
   const attempts = [];
   const done = (outcome, extra = {}) => ({ outcome, attempts, ...extra });
+  let rejected = false; // a tool call was rejected in this request (see the app's runTurn)
   for (let attempt = 1; attempt <= F.MAX_ATTEMPTS; attempt++) {
     // Prefix rule: this request's input must start with everything the previous request sent.
     const prefixOk = conv.sent.every((s, i) => JSON.stringify(conv.items[i]) === s);
@@ -317,9 +318,12 @@ async function request(conv, current, meta) {
     if (res.status === "incomplete") return done("too_big");
 
     if (!call) {
-      if (attempt === 1 && text) return done("reply", { message: text });
-      a.rejection = { kind: "text", error: "replied with text instead of calling a tool" };
-      conv.items.push(...F.replayItems(res.output), { role: "user", content: F.TEXT_ON_RETRY_NUDGE });
+      // Same rule as the app's runTurn: nudge for a tool call; text-only on every attempt is a reply.
+      if (!rejected && attempt === F.MAX_ATTEMPTS && text) return done("reply", { message: text });
+      a.rejection = rejected
+        ? { kind: "text", error: "answered a rejection with text instead of calling a tool" }
+        : { kind: "no_tool", error: "answered with only text, no tool call" };
+      conv.items.push(...F.replayItems(res.output), { role: "user", content: rejected ? F.TEXT_ON_RETRY_NUDGE : F.NO_TOOL_NUDGE });
       continue;
     }
 
@@ -370,18 +374,21 @@ async function request(conv, current, meta) {
       feedback = `Unknown tool ${call.name}. The template is unchanged. Call one of: ${F.TOOLS.map((t) => t.name).join(", ")}.`;
       a.rejection = { kind: "bad_args", error: feedback };
     }
+    rejected = true;
     conv.items.push(...F.replayItems(res.output), { type: "function_call_output", call_id: call.call_id, output: feedback });
   }
   return done("invalid", { detail: attempts.at(-1)?.rejection?.error ?? "" });
 }
 
 // ---------------- offline stand-in for Ember ----------------
-// Answers with the reference edits. On a variant B tweak's first attempt it sends a find that
-// isn't in the template, so the rejection and retry path runs too.
+// Answers with the reference edits. On a tweak's first attempt, variant B sends a find that isn't
+// in the template and variant C answers with only text, so both retry paths run too.
 function mockResponse(meta, input) {
   const id = `call_${Math.random().toString(36).slice(2, 8)}`;
   const refs = REFERENCES[meta.sequence][meta.step - 1];
-  const bad = meta.variant === "B" && meta.step > 1 && meta.attempt === 1;
+  const firstTweakAttempt = meta.step > 1 && meta.attempt === 1;
+  const bad = meta.variant === "B" && firstTweakAttempt;
+  const textOnly = meta.variant === "C" && firstTweakAttempt;
   const args = { edits: bad ? [{ find: "NOT IN THE TEMPLATE", replace: "x" }] : refs, summary: `mock step ${meta.step}` };
   const inputTokens = Math.ceil(JSON.stringify(input).length / 3.6) + 1800;
   return {
@@ -389,7 +396,9 @@ function mockResponse(meta, input) {
     status: "completed",
     output: [
       { type: "reasoning", id: `rs_${id}`, summary: [], encrypted_content: "ENCRYPTED" },
-      { type: "function_call", id: `fc_${id}`, call_id: id, name: "edit_template", arguments: JSON.stringify(args), status: "completed" },
+      textOnly
+        ? { type: "message", id: `msg_${id}`, role: "assistant", content: [{ type: "output_text", text: "Making that change for you!" }] }
+        : { type: "function_call", id: `fc_${id}`, call_id: id, name: "edit_template", arguments: JSON.stringify(args), status: "completed" },
     ],
     usage: {
       input_tokens: inputTokens,
@@ -421,6 +430,7 @@ async function recordStep(base, seq, stepIndex, result, earlier) {
     validOnAttempt: result.validOnAttempt,
     rejections: result.attempts.filter((a) => a.rejection).length,
     findRejections: result.attempts.filter((a) => a.rejection?.kind?.startsWith("find_")).length,
+    noToolNudges: result.attempts.filter((a) => a.rejection?.kind === "no_tool").length,
     prefixOk: result.attempts.every((a) => a.prefixOk),
     usage: stepUsage(result.attempts),
   };
@@ -494,11 +504,11 @@ function tweakRow(label, rs) {
   const asked = rs.filter((r) => ["ask", "asset", "reply"].includes(r.outcome)).length;
   const failed = rs.filter((r) => ["invalid", "too_big", "api_error"].includes(r.outcome)).length;
   const input = rs.reduce((s, r) => s + r.usage.input, 0), cached = rs.reduce((s, r) => s + r.usage.cached, 0);
-  return `| ${label} | ${n} | ${pct(passed, n)} | ${pct(edits.length, n)} | ${asked} | ${failed} | ${rs.reduce((s, r) => s + r.findRejections, 0)} | ${rs.reduce((s, r) => s + r.rejections, 0)} | ${num(avg(rs.map((r) => r.attempts.length)), 2)} | ${num(avg(rs.map((r) => r.usage.input)))} | ${num(avg(rs.map((r) => r.usage.uncached)))} | ${pct(cached, input)} | ${num(avg(rs.map((r) => r.usage.output)))} | $${num(avg(rs.map((r) => r.usage.costUsd)) * 1000, 3)} | ${rs.every((r) => r.prefixOk) ? "yes" : "NO"} |`;
+  return `| ${label} | ${n} | ${pct(passed, n)} | ${pct(edits.length, n)} | ${asked} | ${failed} | ${rs.reduce((s, r) => s + r.findRejections, 0)} | ${rs.reduce((s, r) => s + (r.noToolNudges ?? 0), 0)} | ${rs.reduce((s, r) => s + r.rejections, 0)} | ${num(avg(rs.map((r) => r.attempts.length)), 2)} | ${num(avg(rs.map((r) => r.usage.input)))} | ${num(avg(rs.map((r) => r.usage.uncached)))} | ${pct(cached, input)} | ${num(avg(rs.map((r) => r.usage.output)))} | $${num(avg(rs.map((r) => r.usage.costUsd)) * 1000, 3)} | ${rs.every((r) => r.prefixOk) ? "yes" : "NO"} |`;
 }
 const TWEAK_HEAD = [
-  "| group | tweaks | check pass | edit accepted | asked/replied | gave up | find rejections | all rejections | attempts / tweak | input tok / tweak | uncached tok / tweak | cached share | output tok / tweak | cost / 1000 tweaks | prefix kept |",
-  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+  "| group | tweaks | check pass | edit accepted | asked/replied | gave up | find rejections | text-only nudges | all rejections | attempts / tweak | input tok / tweak | uncached tok / tweak | cached share | output tok / tweak | cost / 1000 tweaks | prefix kept |",
+  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
 ];
 
 function summarize(records) {

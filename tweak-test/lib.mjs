@@ -30,7 +30,7 @@ export async function loadFlint() {
       stdin: {
         contents: `export {
   buildInstructions, buildUserMessage, TOOLS, requestBody, replayItems, firstFunctionCall, messageText,
-  applyEdits, validateTemplate, editRejection, TEXT_ON_RETRY_NUDGE, MAX_ATTEMPTS, MAX_OUTPUT_TOKENS,
+  applyEdits, validateTemplate, editRejection, NO_TOOL_NUDGE, TEXT_ON_RETRY_NUDGE, MAX_ATTEMPTS, MAX_OUTPUT_TOKENS,
   EMBER_MODEL, DEFAULT_EMBER_BASE_URL, renderSlip, previewDocument, PAPER_SIZES, costNanoUsd, NANO_USD_PER_USD,
 } from "./src/core";
 export { shops, builtInTemplates } from "./src/data";`,
