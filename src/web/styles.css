@@ -47,11 +47,6 @@ body {
   align-items: start;
 }
 
-/* With the original hidden, the working slip keeps its size and the chat takes the rest of the row. */
-.editor-original-hidden {
-  grid-template-columns: minmax(0, 720px) minmax(360px, 1fr);
-}
-
 .editor-toolbar {
   grid-area: toolbar;
   display: flex;
@@ -59,59 +54,18 @@ body {
   gap: 16px;
 }
 
-/* At the right end of the Original heading, as quiet as the heading's other controls. */
 .order-picker {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-left: auto;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 14px;
   color: var(--muted);
-  white-space: nowrap;
-}
-
-/* The Original heading stays one line; on a narrow pane the label goes and the order name truncates. */
-.slip-pane-head:has(.order-picker) {
-  flex-wrap: nowrap;
-}
-
-.slip-pane-head:has(.order-picker) > * {
-  flex-shrink: 0;
-}
-
-.slip-pane-head > .order-picker {
-  flex-shrink: 1;
-}
-
-@container (max-width: 440px) {
-  .order-picker-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
 }
 
 .order-picker select {
-  appearance: none;
   font: inherit;
   color: #1f1b18;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b5f57' stroke-width='1.5'/%3E%3C/svg%3E")
-    no-repeat right 6px center;
-  min-width: 0;
-  padding: 2px 20px 2px 6px;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-
-.order-picker select:hover {
-  border-color: var(--line);
-  background-color: #fff;
+  padding: 4px 8px;
 }
 
 /* Each pane spans the same four rows (heading, notes, slip, footer) so the two slips stay level. */
@@ -175,8 +129,6 @@ body {
 }
 
 .slip-pane {
-  /* The order picker in the Original heading fits itself to the pane's width. */
-  container-type: inline-size;
   display: grid;
   grid-row: span 4;
   grid-template-rows: subgrid;
