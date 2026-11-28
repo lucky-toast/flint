@@ -13,7 +13,8 @@ const toPx = (len) => {
 };
 
 export async function openBrowser(flint) {
-  const browser = await chromium.launch();
+  // CHROMIUM_PATH points at a Chromium you already have, when Playwright's own build isn't installed.
+  const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const contexts = new Map(); // paper -> context
   const views = new Map(); // cache key -> View
 
