@@ -21,9 +21,10 @@ export function costNanoUsd({ inputTokens, cachedInputTokens, outputTokens }: Us
 /**
  * The most one Ember call can cost, given its serialized request body. A token is at least one
  * UTF-8 byte, so the body's byte length bounds the input tokens; all of them are priced as
- * uncached, and output is capped at MAX_OUTPUT_TOKENS (reasoning included).
+ * uncached, and output is capped at MAX_OUTPUT_TOKENS (reasoning included). `storedBytes` is the
+ * earlier conversation a chained request stands for, counted as input too in case it's billed.
  */
-export function worstCaseNanoUsd(requestBody: string): number {
-  const inputTokens = new TextEncoder().encode(requestBody).byteLength;
+export function worstCaseNanoUsd(requestBody: string, storedBytes = 0): number {
+  const inputTokens = new TextEncoder().encode(requestBody).byteLength + storedBytes;
   return costNanoUsd({ inputTokens, cachedInputTokens: 0, outputTokens: MAX_OUTPUT_TOKENS });
 }

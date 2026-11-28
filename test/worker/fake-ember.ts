@@ -8,7 +8,7 @@ import { vi } from "vitest";
 export const EMBER_URL = "https://api.meta.ai/v1/responses";
 
 type OutputItem = Record<string, unknown>;
-type FakeResponse = { status?: "completed" | "incomplete"; output: OutputItem[]; outputTokens?: number };
+type FakeResponse = { status?: "completed" | "incomplete"; output: OutputItem[]; outputTokens?: number; httpStatus?: number };
 
 let callSeq = 0;
 
@@ -65,6 +65,11 @@ export function editCall(edits: { find: string; replace: string }[], summary: st
   return toolCall("edit_template", { edits, summary });
 }
 
+/** An HTTP error answer, e.g. Meta's brief 400 when chaining from a response that just completed. */
+export function httpError(httpStatus: number): FakeResponse {
+  return { output: [], httpStatus };
+}
+
 export function truncated(): FakeResponse {
   return { status: "incomplete", output: [reasoning()], outputTokens: 4000 };
 }
@@ -104,6 +109,7 @@ export function fakeEmber(...responses: FakeResponse[]) {
     calls.push({ headers: request.headers, body: await request.json() });
     const next = responses[calls.length - 1];
     if (!next) throw new Error(`Unexpected Ember call #${calls.length}`);
+    if (next.httpStatus) return Response.json({ error: { message: "fake error" } }, { status: next.httpStatus });
     return Response.json(responseBody(next));
   });
   return calls;

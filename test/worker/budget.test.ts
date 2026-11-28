@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { reset } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { worstCaseNanoUsd } from "../../src/core";
 import { GLOBAL_BUDGET } from "../../src/worker/budget";
 import { postTurn } from "./client";
 import { editCall, fakeEmber, toolCall } from "./fake-ember";
@@ -24,6 +25,16 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("worst-case estimate", () => {
+  it("counts the stored conversation a chained request stands for as input", () => {
+    const body = JSON.stringify({ input: [{ role: "user", content: "Make the logo bigger" }] });
+    const perInputToken = worstCaseNanoUsd(body, 1) - worstCaseNanoUsd(body);
+
+    expect(perInputToken).toBeGreaterThan(0);
+    expect(worstCaseNanoUsd(body, 10_000)).toBe(worstCaseNanoUsd(body) + 10_000 * perInputToken);
+  });
 });
 
 describe("budget object", () => {

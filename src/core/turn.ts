@@ -67,35 +67,49 @@ export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurn
   const instructions = buildInstructions(baseShop);
   // Edits are validated with placeholder images under the uploaded names.
   const shop = withUploadedAssets(baseShop, input.uploadedAssets);
-  const items: InputItem[] = [{ role: "user", content: buildUserMessage(input) }];
+  const cacheKey = promptCacheKey(baseShop.id);
+  // What the next request sends. Each retry chains from the attempt before it (stored on Ember's
+  // side), so it holds only the feedback for that attempt.
+  let pending: InputItem[] = [{ role: "user", content: buildUserMessage(input) }];
+  let previousResponseId: string | undefined;
+  let storedBytes = 0;
   // Once a tool call has been rejected, text is never shown: Ember must fix the call.
   let rejected = false;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const response = await ember.respond({ instructions, input: items, tools: TOOLS, cacheKey: promptCacheKey(baseShop.id) });
+    const response = await ember.respond({ instructions, input: pending, tools: TOOLS, cacheKey, previousResponseId, storedBytes });
     await onUsage?.(response.usage);
 
     if (response.status === "incomplete") return { type: "error", error: "too_big" };
 
+    let next: InputItem;
     const call = firstFunctionCall(response.output);
     if (!call) {
       const text = messageText(response.output).trim();
       // Text only on every attempt: show the last text rather than nothing.
       if (!rejected && attempt === MAX_ATTEMPTS && text) return { type: "reply", message: text };
-      items.push(...replayItems(response.output), { role: "user", content: rejected ? TEXT_ON_RETRY_NUDGE : NO_TOOL_NUDGE });
-      continue;
+      next = { role: "user", content: rejected ? TEXT_ON_RETRY_NUDGE : NO_TOOL_NUDGE };
+    } else {
+      const outcome = await handleCall(call, shop, input.templateSource);
+      if ("result" in outcome) return outcome.result;
+      rejected = true;
+      next = { type: "function_call_output", call_id: call.call_id, output: outcome.feedback };
     }
 
-    const outcome = await handleCall(call, shop, input.templateSource);
-    if ("result" in outcome) return outcome.result;
-    rejected = true;
-    items.push(...replayItems(response.output), {
-      type: "function_call_output",
-      call_id: call.call_id,
-      output: outcome.feedback,
-    });
+    if (response.id) {
+      storedBytes += byteLength(pending) + byteLength(response.output);
+      previousResponseId = response.id;
+      pending = [next];
+    } else {
+      // No stored response to chain from (e.g. a client that doesn't return an id): resend it all.
+      pending = [...pending, ...replayItems(response.output), next];
+    }
   }
   return { type: "error", error: "invalid" };
+}
+
+function byteLength(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
 type CallOutcome = { result: TurnResult } | { feedback: string };

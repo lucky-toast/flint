@@ -42,8 +42,8 @@
 //   --print-request       print each sequence's first request body and exit
 //   --skip-self-test      don't run the self-test before a live or mock run
 //   --cache-key=K|off     prompt_cache_key to send [the app's per-shop key, flint-kiln-and-co]
-//   --responses-state=S   stateless (resend everything, as the app does) or stored
-//                         (store: true + previous_response_id, only new items) [stateless]
+//   --responses-state=S   stored (store: true + previous_response_id, only new items, as the
+//                         app does) or stateless (resend everything) [stored]
 //
 // Output (tweak-test/results/<timestamp>/), appended as the run goes:
 //   calls.jsonl     every API call: exact request body, raw response or error, status, latency
@@ -97,9 +97,9 @@ const CONFIG = {
   dryRun: !!args["dry-run"],
   mock: !!args.mock,
   printRequest: !!args["print-request"],
-  // "stateless": resend the whole conversation (what the app does). "stored": store: true and
-  // previous_response_id, sending only the new items (#45).
-  responsesState: args["responses-state"] ?? "stateless",
+  // "stored": store: true and previous_response_id, sending only the new items (what the app does,
+  // #45). "stateless": store: false, resending the whole conversation with encrypted reasoning.
+  responsesState: args["responses-state"] ?? "stored",
   // prompt_cache_key: the app's per-shop key by default, "off" to send none (#43).
   cacheKey: args["cache-key"],
   shopId: "kiln-and-co",
@@ -225,17 +225,16 @@ const costUsd = (u) => F.costNanoUsd({ inputTokens: u.input, cachedInputTokens: 
 
 class Stop extends Error {}
 
-// The request body for this conversation. Stateless: the whole conversation, as the app sends it.
-// Stored: only the items after the last stored response, chained with previous_response_id;
-// instructions and tools are still resent (they don't carry over), and encrypted reasoning
-// can't be requested alongside previous_response_id (HTTP 400), so it isn't.
+// The request body for this conversation. Stored (the app's own requestBody): only the items
+// after the last stored response, chained with previous_response_id; instructions and tools are
+// still resent (they don't carry over). Stateless: store: false and the whole conversation, with
+// encrypted reasoning requested so it can be replayed.
 function bodyFor(conv) {
-  const body = F.requestBody({ instructions: INSTRUCTIONS, input: conv.items, tools: F.TOOLS, cacheKey: CONFIG.cacheKey ?? undefined });
-  if (!STORED) return body;
-  const { include, ...rest } = body;
-  return conv.lastId
-    ? { ...rest, store: true, previous_response_id: conv.lastId, input: conv.items.slice(conv.covered) }
-    : { ...rest, store: true };
+  const cacheKey = CONFIG.cacheKey ?? undefined;
+  if (STORED) {
+    return F.requestBody({ instructions: INSTRUCTIONS, tools: F.TOOLS, cacheKey, previousResponseId: conv.lastId, input: conv.lastId ? conv.items.slice(conv.covered) : conv.items });
+  }
+  return { ...F.requestBody({ instructions: INSTRUCTIONS, input: conv.items, tools: F.TOOLS, cacheKey }), store: false, include: ["reasoning.encrypted_content"] };
 }
 
 // Appends a response's output to the local conversation. In stored mode the server already has
@@ -667,7 +666,7 @@ async function main() {
     for (const seq of sequences) {
       const tpl = TEMPLATES[seq.template];
       const input = [{ role: "user", content: F.buildUserMessage({ templateSource: tpl.source, history: [], message: seq.steps[0].text }) }];
-      console.log(`\n===== ${seq.id} (first request) =====\n${JSON.stringify(F.requestBody({ instructions: INSTRUCTIONS, input, tools: F.TOOLS }), null, 2)}`);
+      console.log(`\n===== ${seq.id} (first request) =====\n${JSON.stringify(bodyFor({ items: input }), null, 2)}`);
     }
     return;
   }

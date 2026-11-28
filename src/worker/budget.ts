@@ -119,7 +119,7 @@ function isRefusal(err: unknown): boolean {
 export function budgetedEmber(ember: EmberClient, budget: BudgetStub): EmberClient {
   return {
     async respond(request) {
-      const reservation = await budget.reserve(worstCaseNanoUsd(JSON.stringify(requestBody(request))));
+      const reservation = await budget.reserve(worstCaseNanoUsd(JSON.stringify(requestBody(request)), request.storedBytes));
       if (!reservation.ok) throw new BudgetExhausted();
       let usage: Usage | null = null;
       try {
