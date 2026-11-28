@@ -60,8 +60,9 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
   };
 
   return (
-    <div className={originalHidden ? "editor editor-original-hidden" : "editor"}>
+    <div className="editor">
       <div className="editor-toolbar">
+        <OrderPicker orders={shop.orders} orderId={order.id} onChange={switchOrder} />
         <SlipActions
           shop={shop}
           template={template}
@@ -85,13 +86,9 @@ export function Editor({ shop, template, onSaved, onUnsavedChange, replayChips }
             zoom={zoom}
             onZoom={setZoom}
             action={
-              <>
-                <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(true)}>
-                  Hide original
-                </button>
-                {/* Hides with the original; the working slip keeps the order picked. */}
-                <OrderPicker orders={shop.orders} orderId={order.id} onChange={switchOrder} />
-              </>
+              <button type="button" className="pane-toggle" onClick={() => setOriginalHidden(true)}>
+                Hide original
+              </button>
             }
           />
         )}
