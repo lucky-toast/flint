@@ -25,6 +25,7 @@
 // Usage:
 //   node token-count.mjs --dry-run      prepare every case, print the plan, no calls
 //   node token-count.mjs
+//   node token-count.mjs --summarize=results/<timestamp>   rebuild summary.md, no calls
 //
 // Options (defaults in brackets):
 //   --model=ID            [muse-ember-1.0]  (the app's model; counts are per model)
@@ -51,10 +52,9 @@
 //   sources.json   what was found in inputs/ (dimensions, pages, text layer).
 //   results.json + summary.md   written at the end.
 
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildCases } from "./cases.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const ENV_PATH = join(HERE, ".env");
@@ -139,19 +139,19 @@ async function countTokens(body) {
   return lastErr;
 }
 
-function summarize(rows, sources, warnings) {
+function summarize(rows, sources, warnings, cfg = CONFIG) {
   const base = rows.find((r) => r.id === "baseline")?.inputTokens;
   const lines = [
-    `# Token count — ${CONFIG.model}`,
+    `# Token count — ${cfg.model}`,
     "",
-    `Endpoint: \`POST ${CONFIG.baseUrl}/responses/input_tokens\`. Prompt-only baseline: **${base ?? "n/a"}** tokens; "media" = count − baseline.`,
+    `Endpoint: \`POST ${cfg.baseUrl}/responses/input_tokens\`. Prompt-only baseline: **${base ?? "n/a"}** tokens; "media" = count − baseline.`,
     "",
   ];
   if (warnings.length) lines.push("**Warnings**", "", ...warnings.map((w) => `- ${w}`), "");
 
   lines.push("## Sources", "", "| Source | File | Size | Pages | Text layer | Bytes |", "|---|---|---|---|---|---|");
   for (const s of sources) {
-    const size = s.width ? `${s.width}×${s.height}` : `${s.longEdgeAtFullDpi}px long edge @ ${CONFIG.pdfDpi} dpi`;
+    const size = s.width ? `${s.width}×${s.height}` : `${s.longEdgeAtFullDpi}px long edge @ ${cfg.pdfDpi} dpi`;
     const text = s.textChars == null ? "" : s.textChars ? `${s.textChars} chars` : "none";
     lines.push(`| ${s.id} | ${s.file} | ${size} | ${s.pages ?? ""} | ${text} | ${fmtBytes(s.bytes)} |`);
   }
@@ -195,6 +195,35 @@ function summarize(rows, sources, warnings) {
 }
 
 // ---------------- main ----------------
+
+// --summarize=DIR: rebuild summary.md from a finished run's files; no calls.
+if (args.summarize) {
+  const dir = String(args.summarize);
+  const read = (f) => readFileSync(join(dir, f), "utf8");
+  const cfg = existsSync(join(dir, "config.json")) ? JSON.parse(read("config.json")) : CONFIG;
+  const saved = existsSync(join(dir, "results.json")) ? JSON.parse(read("results.json")) : {};
+  const sources = saved.sources ?? (existsSync(join(dir, "sources.json")) ? JSON.parse(read("sources.json")) : []);
+  const rows = existsSync(join(dir, "counts.jsonl"))
+    ? read("counts.jsonl")
+        .split("\n")
+        .filter((l) => l.trim())
+        .map((l) => {
+          const { request: _req, result: _res, ...row } = JSON.parse(l);
+          return row;
+        })
+    : [];
+  if (!rows.length) {
+    console.error(`No counts found in ${join(dir, "counts.jsonl")}`);
+    process.exit(1);
+  }
+  writeFileSync(join(dir, "summary.md"), summarize(rows, sources, saved.warnings ?? [], cfg));
+  writeFileSync(join(dir, "results.json"), JSON.stringify({ ...saved, rows }, null, 2));
+  console.log(`Rebuilt ${join(dir, "summary.md")} from ${rows.length} counts`);
+  process.exit(0);
+}
+
+// Loaded here so --summarize works without the media dependencies.
+const { buildCases } = await import("./cases.mjs");
 const { cases, sources, warnings } = await buildCases(CONFIG);
 for (const w of warnings) console.warn(`warning: ${w}`);
 console.log(`${cases.length} cases from ${sources.length} source(s), model ${CONFIG.model}`);
@@ -243,6 +272,7 @@ for (const [i, c] of cases.entries()) {
   row.status = result.status;
   row.ms = result.ms;
   row.inputTokens = result.response?.input_tokens ?? null;
+  rows.push(row);
   appendFileSync(join(outDir, "counts.jsonl"), JSON.stringify({ ...row, request: redact(body), result }) + "\n");
   console.log(`${label}: ${row.inputTokens ?? `HTTP ${result.status} ${JSON.stringify(result.response ?? result.error).slice(0, 200)}`}`);
   await sleep(CONFIG.delayMs);
