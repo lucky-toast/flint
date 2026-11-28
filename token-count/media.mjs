@@ -35,6 +35,16 @@ export async function resizeImage(buf, info, longEdge, { jpegQuality = 90 } = {}
   return { bytes: data, width: out.width, height: out.height, mime: info.format === "png" ? "image/png" : "image/jpeg" };
 }
 
+/**
+ * The upload rule: the image at most `maxPixels` in total, keeping its shape, never enlarged.
+ * An image already within the limit is returned as its original bytes.
+ */
+export async function fitToPixels(buf, info, maxPixels, opts = {}) {
+  if (info.width * info.height <= maxPixels) return resizeImage(buf, info, "full", opts);
+  const scale = Math.sqrt(maxPixels / (info.width * info.height));
+  return resizeImage(buf, info, Math.floor(info.longEdge * scale), opts);
+}
+
 /** Opens a PDF and reports its pages (size in points) and whether it has a text layer. */
 export function openPdf(buf, { maxPages = 50 } = {}) {
   const doc = mupdf.Document.openDocument(buf, "application/pdf");

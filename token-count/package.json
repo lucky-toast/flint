@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dry-run": "node token-count.mjs --dry-run",
-    "count": "node token-count.mjs"
+    "count": "node token-count.mjs",
+    "flatten": "node flatten-pdf.mjs",
+    "turns": "node turn-run.mjs"
   },
   "license": "ISC",
   "private": true,
   "dependencies": {
+    "liquidjs": "^10.30.1",
     "mupdf": "^1.26.4",
+    "pdf-lib": "^1.17.1",
     "sharp": "^0.35.5"
   }
 }
