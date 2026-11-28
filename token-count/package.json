@@ -1,0 +1,16 @@
+{
+  "name": "flint-token-count",
+  "version": "1.0.0",
+  "description": "Counts how many Muse input tokens each design input (PDF, PNG, sketch photo) would use, at several sizes",
+  "type": "module",
+  "scripts": {
+    "dry-run": "node token-count.mjs --dry-run",
+    "count": "node token-count.mjs"
+  },
+  "license": "ISC",
+  "private": true,
+  "dependencies": {
+    "mupdf": "^1.26.4",
+    "sharp": "^0.34.3"
+  }
+}
