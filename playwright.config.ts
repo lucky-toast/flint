@@ -40,7 +40,13 @@ export default defineConfig({
   // Every test starts with the e2e access code stored, so turns run live against the fake Ember;
   // replay tests opt out (test/e2e/replay.spec.ts).
   use: { baseURL: appURL, trace: "retain-on-failure", storageState: withAccessCode },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // CHROMIUM_PATH points at an already-installed Chromium when Playwright's own build isn't downloaded.
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], launchOptions: { executablePath: process.env.CHROMIUM_PATH || undefined } },
+    },
+  ],
   webServer: [
     {
       command: `node test/e2e/support/fake-ember-server.ts ${fakeEmberPort}`,
