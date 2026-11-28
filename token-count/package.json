@@ -11,6 +11,6 @@
   "private": true,
   "dependencies": {
     "mupdf": "^1.26.4",
-    "sharp": "^0.34.3"
+    "sharp": "^0.35.5"
   }
 }
