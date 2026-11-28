@@ -30,7 +30,21 @@ export type EmberResponse = {
   usage: Usage;
 };
 
-export type EmberRequest = { instructions: string; input: InputItem[]; tools: FunctionTool[] };
+export type EmberRequest = {
+  instructions: string;
+  input: InputItem[];
+  tools: FunctionTool[];
+  /** Sent as prompt_cache_key: requests with the same key go to the same Ember server, so a shared prefix is more likely cached. */
+  cacheKey?: string;
+};
+
+/**
+ * One cache key per shop. Requests for a shop share its prefix (instructions and tools), and
+ * Meta advises one stable key per shared prefix, not one per user or session (#43).
+ */
+export function promptCacheKey(shopId: string): string {
+  return `flint-${shopId}`;
+}
 
 export type EmberClient = { respond(request: EmberRequest): Promise<EmberResponse> };
 
@@ -52,9 +66,10 @@ export type EmberClientOptions = {
 };
 
 /** The full request body: stable content (instructions, tools) first so the prefix caches. */
-export function requestBody({ instructions, input, tools }: EmberRequest) {
+export function requestBody({ instructions, input, tools, cacheKey }: EmberRequest) {
   return {
     model: EMBER_MODEL,
+    ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
     instructions,
     tools,
     tool_choice: "auto",

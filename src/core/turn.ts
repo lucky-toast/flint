@@ -3,6 +3,7 @@ import { applyEdits } from "./edits";
 import {
   firstFunctionCall,
   messageText,
+  promptCacheKey,
   replayItems,
   type EmberClient,
   type FunctionCallItem,
@@ -71,7 +72,7 @@ export async function runTurn({ ember, shop: baseShop, input, onUsage }: RunTurn
   let rejected = false;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const response = await ember.respond({ instructions, input: items, tools: TOOLS });
+    const response = await ember.respond({ instructions, input: items, tools: TOOLS, cacheKey: promptCacheKey(baseShop.id) });
     await onUsage?.(response.usage);
 
     if (response.status === "incomplete") return { type: "error", error: "too_big" };

@@ -59,6 +59,7 @@ describe("POST /api/turn, live edit", () => {
     expect(headers.get("authorization")).toBe("Bearer test-ember-key");
     expect(body).toMatchObject({
       model: "muse-ember-1.0",
+      prompt_cache_key: "flint-kiln-and-co",
       store: false,
       include: ["reasoning.encrypted_content"],
       tool_choice: "auto",

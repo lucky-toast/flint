@@ -41,6 +41,9 @@
 //   --timeout-s=N         per-call HTTP timeout [180]
 //   --print-request       print each sequence's first request body and exit
 //   --skip-self-test      don't run the self-test before a live or mock run
+//   --cache-key=K|off     prompt_cache_key to send [the app's per-shop key, flint-kiln-and-co]
+//   --responses-state=S   stateless (resend everything, as the app does) or stored
+//                         (store: true + previous_response_id, only new items) [stateless]
 //
 // Output (tweak-test/results/<timestamp>/), appended as the run goes:
 //   calls.jsonl     every API call: exact request body, raw response or error, status, latency
@@ -83,6 +86,11 @@ const CONFIG = {
   dryRun: !!args["dry-run"],
   mock: !!args.mock,
   printRequest: !!args["print-request"],
+  // "stateless": resend the whole conversation (what the app does). "stored": store: true and
+  // previous_response_id, sending only the new items (#45).
+  responsesState: args["responses-state"] ?? "stateless",
+  // prompt_cache_key: the app's per-shop key by default, "off" to send none (#43).
+  cacheKey: args["cache-key"],
   shopId: "kiln-and-co",
   // Dry-run estimates only: per-call output, and how much a tweak adds besides a restated template.
   typicalOutput: 700,
@@ -102,10 +110,14 @@ const TOOL_RESULTS = {
 };
 for (const v of CONFIG.variants) if (!TOOL_RESULTS[v]) die(`unknown variant: ${v}`);
 for (const t of CONFIG.templates) if (!["classic", "compact"].includes(t)) die(`unknown template: ${t}`);
+if (!["stateless", "stored"].includes(CONFIG.responsesState)) die(`unknown --responses-state: ${CONFIG.responsesState}`);
+const STORED = CONFIG.responsesState === "stored";
 
 const F = await loadFlint();
 CONFIG.baseUrl ??= F.DEFAULT_EMBER_BASE_URL;
 const SHOP = F.shops.find((s) => s.id === CONFIG.shopId);
+if (CONFIG.cacheKey === undefined || CONFIG.cacheKey === true) CONFIG.cacheKey = F.promptCacheKey(SHOP.id);
+if (CONFIG.cacheKey === "off") CONFIG.cacheKey = null;
 const TEMPLATES = Object.fromEntries(F.builtInTemplates.map((t) => [t.id, t]));
 const INSTRUCTIONS = F.buildInstructions(SHOP);
 
@@ -202,8 +214,29 @@ const costUsd = (u) => F.costNanoUsd({ inputTokens: u.input, cachedInputTokens: 
 
 class Stop extends Error {}
 
-async function callEmber(input, meta) {
-  const body = F.requestBody({ instructions: INSTRUCTIONS, input, tools: F.TOOLS });
+// The request body for this conversation. Stateless: the whole conversation, as the app sends it.
+// Stored: only the items after the last stored response, chained with previous_response_id;
+// instructions and tools are still resent (they don't carry over), and encrypted reasoning
+// can't be requested alongside previous_response_id (HTTP 400), so it isn't.
+function bodyFor(conv) {
+  const body = F.requestBody({ instructions: INSTRUCTIONS, input: conv.items, tools: F.TOOLS, cacheKey: CONFIG.cacheKey ?? undefined });
+  if (!STORED) return body;
+  const { include, ...rest } = body;
+  return conv.lastId
+    ? { ...rest, store: true, previous_response_id: conv.lastId, input: conv.items.slice(conv.covered) }
+    : { ...rest, store: true };
+}
+
+// Appends a response's output to the local conversation. In stored mode the server already has
+// it, so it's marked as covered and not sent again.
+function pushOutput(conv, output) {
+  conv.items.push(...F.replayItems(output));
+  if (STORED) conv.covered = conv.items.length;
+}
+
+async function callEmber(conv, meta) {
+  const body = bodyFor(conv);
+  const input = body.input;
   if (state.calls >= CONFIG.maxCalls) throw new Stop(`call cap reached (${CONFIG.maxCalls})`);
   const spent = state.input + state.output;
   const worst = estTokens(body) + F.MAX_OUTPUT_TOKENS;
@@ -220,13 +253,22 @@ async function callEmber(input, meta) {
       entry.httpStatus = "mock";
       entry.response = data;
     } else {
-      const res = await fetch(entry.url, {
-        method: "POST",
-        headers: { authorization: `Bearer ${CONFIG.apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(CONFIG.timeoutMs),
-      });
-      const text = await res.text();
+      const send = () =>
+        fetch(entry.url, {
+          method: "POST",
+          headers: { authorization: `Bearer ${CONFIG.apiKey}`, "content-type": "application/json" },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(CONFIG.timeoutMs),
+        });
+      let res = await send();
+      let text = await res.text();
+      // Meta: a just-completed response can briefly answer HTTP 400 when chained; retry with a short backoff.
+      for (let retry = 1; res.status === 400 && body.previous_response_id && retry <= 2; retry++) {
+        entry.chainRetries = retry;
+        await new Promise((r) => setTimeout(r, 1000 * retry));
+        res = await send();
+        text = await res.text();
+      }
       entry.httpStatus = res.status;
       entry.requestId = res.headers.get("x-request-id") ?? undefined;
       try {
@@ -246,6 +288,12 @@ async function callEmber(input, meta) {
     LOG.inflight = null;
     entry.latencyMs = Date.now() - t0;
     logLine("calls.jsonl", entry);
+  }
+
+  // Everything sent is now part of this response's stored history.
+  if (STORED) {
+    conv.lastId = data.id;
+    conv.covered = conv.items.length;
   }
 
   const u = data.usage ?? {};
@@ -296,7 +344,7 @@ async function request(conv, current, meta) {
     const prefixOk = conv.sent.every((s, i) => JSON.stringify(conv.items[i]) === s);
     let res;
     try {
-      res = await callEmber(conv.items, { ...meta, attempt });
+      res = await callEmber(conv, { ...meta, attempt });
     } catch (e) {
       if (e instanceof Stop) throw e;
       return done("api_error", { detail: e.message });
@@ -323,7 +371,8 @@ async function request(conv, current, meta) {
       a.rejection = rejected
         ? { kind: "text", error: "answered a rejection with text instead of calling a tool" }
         : { kind: "no_tool", error: "answered with only text, no tool call" };
-      conv.items.push(...F.replayItems(res.output), { role: "user", content: rejected ? F.TEXT_ON_RETRY_NUDGE : F.NO_TOOL_NUDGE });
+      pushOutput(conv, res.output);
+      conv.items.push({ role: "user", content: rejected ? F.TEXT_ON_RETRY_NUDGE : F.NO_TOOL_NUDGE });
       continue;
     }
 
@@ -375,7 +424,8 @@ async function request(conv, current, meta) {
       a.rejection = { kind: "bad_args", error: feedback };
     }
     rejected = true;
-    conv.items.push(...F.replayItems(res.output), { type: "function_call_output", call_id: call.call_id, output: feedback });
+    pushOutput(conv, res.output);
+    conv.items.push({ type: "function_call_output", call_id: call.call_id, output: feedback });
   }
   return done("invalid", { detail: attempts.at(-1)?.rejection?.error ?? "" });
 }
@@ -459,14 +509,15 @@ async function runSequence(seq, run, order) {
   if (r1.outcome !== "edit") return records;
 
   for (const variant of order) {
-    const conv = { items: structuredClone(first.items), sent: [...first.sent] };
+    // Every variant branches from the shared first response (in stored mode, chains from its id).
+    const conv = { items: structuredClone(first.items), sent: [...first.sent], lastId: first.lastId, covered: first.covered };
     let current = r1.source;
     let last = r1;
     const earlier = [r1.source];
     for (let i = 1; i < seq.steps.length; i++) {
       // The accepted edit, its tool result (the wording under test), then the tweak.
+      pushOutput(conv, last.output);
       conv.items.push(
-        ...F.replayItems(last.output),
         { type: "function_call_output", call_id: last.callId, output: TOOL_RESULTS[variant](current) },
         { role: "user", content: `Request: ${seq.steps[i].text}` },
       );
@@ -513,7 +564,15 @@ const TWEAK_HEAD = [
 
 function summarize(records) {
   const tweaks = records.filter((r) => r.step > 1);
-  const out = ["# Tweak experiment results", ""];
+  const out = [
+    "# Tweak experiment results",
+    "",
+    `Mode: ${CONFIG.responsesState} · prompt_cache_key: ${CONFIG.cacheKey ?? "none"}`,
+    ...(STORED
+      ? ["", "Stored mode: usage counts only the items sent in each request, not the stored history Ember rebuilds, so input, uncached and cached-share columns can't be compared with a stateless run."]
+      : []),
+    "",
+  ];
   const table = (title, groups) => {
     out.push(`## ${title}`, "", ...TWEAK_HEAD);
     for (const [label, rs] of groups) if (rs.length) out.push(tweakRow(label, rs));
