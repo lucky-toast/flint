@@ -18,6 +18,11 @@ playwright-report/
 # Limit-test output (raw API requests/responses)
 limit-test/results/
 
+# Token-count output and inputs (real designs; only the inputs README is committed)
+token-count/results/
+token-count/inputs/*
+!token-count/inputs/README.md
+
 # OS / editor
 .DS_Store
 
