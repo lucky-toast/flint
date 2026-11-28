@@ -168,7 +168,7 @@ See `docs/adr/0001-embed-flint-in-the-sellers-app.md`. This is for the demo vide
 - Tool calls arrive as `function_call` output items. Ember may also emit a `message` item, which is ignored when a tool is called.
 - `status: "incomplete"` is treated as truncated output.
 - Stable content (instructions, schema, asset names, tools) goes first so the prefix caches. About 87% of input was cached in testing. `prompt_cache_key` routes a shop's requests to the same Ember server; Meta advises one stable key per shared prefix, not one per user or session.
-- The budget's worst-case estimate for a chained request also counts the stored conversation it stands for, because Meta doesn't document how that history is billed.
+- A chained request's usage counts the whole conversation Meta rebuilds, so the budget's worst-case estimate for it also counts the stored conversation it stands for.
 - Chat history is trimmed to about the last 10 turns. Undone turns are dropped from the history sent to Ember.
 
 ### Tools

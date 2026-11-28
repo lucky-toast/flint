@@ -43,8 +43,8 @@ export type EmberRequest = {
   /** Chains this request from a stored response, so input holds only what is new since then. */
   previousResponseId?: string;
   /**
-   * Bytes of earlier conversation that previousResponseId stands for. Not sent: the budget's
-   * worst-case estimate counts them, because Meta doesn't document how that history is billed.
+   * Bytes of earlier conversation that previousResponseId stands for. Not sent, but Ember's usage
+   * counts that history as input, so the budget's worst-case estimate counts these bytes too.
    */
   storedBytes?: number;
 };

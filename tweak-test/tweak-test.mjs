@@ -579,7 +579,7 @@ function summarize(records) {
     "",
     `Mode: ${CONFIG.responsesState} · prompt_cache_key: ${CONFIG.cacheKey ?? "none"}`,
     ...(STORED
-      ? ["", "Stored mode: usage counts only the items sent in each request, not the stored history Ember rebuilds, so input, uncached and cached-share columns can't be compared with a stateless run."]
+      ? ["", "Stored mode: usage counts the whole conversation Ember rebuilds, not just the items sent, so the input, uncached and cached-share columns compare directly with a stateless run."]
       : []),
     "",
   ];
