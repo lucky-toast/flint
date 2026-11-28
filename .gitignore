@@ -27,3 +27,6 @@ limit-test/results/
 
 # Local turn logs (npm start) and their review pages
 logs/
+
+# Design mockups (/mockup skill output)
+mockups/
